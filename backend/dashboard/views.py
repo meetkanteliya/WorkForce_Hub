@@ -20,6 +20,7 @@ from .serializers import (
     PendingLeaveSerializer,
     SalaryOverviewItemSerializer,
     AuditLogSerializer,
+    NotificationSerializer,
 )
 
 User = get_user_model()
@@ -132,7 +133,7 @@ class DashboardSummaryView(APIView):
             "recently_added_employees": list(
                 Employee.objects.select_related("user", "department")
                 .order_by("-user__date_joined")
-                .values("id", "user__username", "user__role", "department__name", "user__date_joined")[:5]
+                .values("id", "user__username", "user__role", "department__name", "user__date_joined", "profile_picture")[:5]
             ),
 
             # Real Audit Log
@@ -366,3 +367,66 @@ class DashboardActivityView(APIView):
         logs = AuditLog.objects.select_related("actor", "target_user")[:30]
         serializer = AuditLogSerializer(logs, many=True)
         return Response(serializer.data)
+
+
+# ──────────────── 9. NOTIFICATIONS ──────────────────────────────────
+from rest_framework.permissions import IsAuthenticated
+from .models import Notification
+
+
+class NotificationListView(APIView):
+    """
+    GET /api/dashboard/notifications/
+    Returns current user's notifications (last 50).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user=request.user)[:50]
+        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response({
+            "unread_count": unread_count,
+            "results": serializer.data,
+        })
+
+
+class NotificationMarkReadView(APIView):
+    """
+    PATCH /api/dashboard/notifications/<id>/read/
+    Marks a single notification as read.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            notification = Notification.objects.get(pk=pk, user=request.user)
+        except Notification.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+        notification.is_read = True
+        notification.save()
+        return Response({"status": "read"})
+
+
+class NotificationMarkAllReadView(APIView):
+    """
+    PATCH /api/dashboard/notifications/read-all/
+    Marks all notifications as read.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"status": "all read"})
+
+
+class NotificationClearAllView(APIView):
+    """
+    DELETE /api/dashboard/notifications/clear-all/
+    Deletes all notifications for the current user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        Notification.objects.filter(user=request.user).delete()
+        return Response({"status": "cleared"})

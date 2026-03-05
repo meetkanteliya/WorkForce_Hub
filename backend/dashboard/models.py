@@ -42,3 +42,27 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"[{self.action_type}] {self.message} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class Notification(models.Model):
+    """
+    In-app notification for employees (e.g., leave approved/rejected).
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+        help_text="The user who receives this notification.",
+    )
+    message = models.TextField()
+    is_read = models.BooleanField(default=False, db_index=True)
+    link = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Notification"
+        verbose_name_plural = "Notifications"
+
+    def __str__(self):
+        return f"[{'Read' if self.is_read else 'Unread'}] {self.message[:50]}"

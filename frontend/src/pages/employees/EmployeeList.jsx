@@ -85,9 +85,11 @@ export default function EmployeeList() {
                                 <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-                                                {emp.user?.username?.[0]?.toUpperCase() || '?'}
-                                            </div>
+                                            <img
+                                                src={emp.profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user?.username || '?')}&size=64&background=4F46E5&color=fff&bold=true&font-size=0.45`}
+                                                alt={emp.user?.username}
+                                                className="w-8 h-8 rounded-full object-cover bg-indigo-100 shrink-0"
+                                            />
                                             <div>
                                                 <p className="text-sm font-medium text-gray-800">{emp.user?.username}</p>
                                                 <p className="text-xs text-gray-400">{emp.user?.email}</p>
@@ -96,7 +98,7 @@ export default function EmployeeList() {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{emp.designation || '—'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">
-                                        {typeof emp.department === 'object' ? emp.department?.name : emp.department || '—'}
+                                        {emp.department_name || '—'}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{emp.phone || '—'}</td>
                                     <td className="px-6 py-4 text-right">

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
+import Cropper from 'react-easy-crop';
 import {
     Mail,
     Phone,
@@ -14,13 +15,13 @@ import {
     Check,
     X,
     Wallet,
-    CalendarPlus,
     BriefcaseBusiness,
-    UserCircle
+    UserCircle,
+    Camera,
 } from 'lucide-react';
 
 export default function Profile() {
-    const { user, login } = useAuth();
+    const { user, login, setProfilePic } = useAuth();
     const [employee, setEmployee] = useState(null);
     const [salarySummary, setSalarySummary] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -93,6 +94,17 @@ export default function Profile() {
         }
     };
 
+    // ─── Crop state (must be before any conditional returns!) ───
+    const [cropImage, setCropImage] = useState(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [uploading, setUploading] = useState(false);
+
+    const onCropComplete = useCallback((_, croppedPixels) => {
+        setCroppedAreaPixels(croppedPixels);
+    }, []);
+
     if (loading) {
         return (
             <div className="flex justify-center py-20">
@@ -101,8 +113,59 @@ export default function Profile() {
         );
     }
 
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'User')}&size=128&background=1A2B3C&color=fff&bold=true&font-size=0.4`;
+    const avatarUrl = employee?.profile_picture
+        ? employee.profile_picture
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'User')}&size=128&background=1A2B3C&color=fff&bold=true&font-size=0.4`;
     const canEditWorkInfo = user?.role !== 'employee';
+
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => setCropImage(reader.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    const getCroppedBlob = (imageSrc, pixelCrop) => {
+        return new Promise((resolve) => {
+            const image = new Image();
+            image.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = pixelCrop.width;
+                canvas.height = pixelCrop.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(
+                    image,
+                    pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height,
+                    0, 0, pixelCrop.width, pixelCrop.height
+                );
+                canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92);
+            };
+            image.src = imageSrc;
+        });
+    };
+
+    const handleCropSave = async () => {
+        if (!cropImage || !croppedAreaPixels) return;
+        setUploading(true);
+        try {
+            const blob = await getCroppedBlob(cropImage, croppedAreaPixels);
+            const formData = new FormData();
+            formData.append('profile_picture', blob, 'profile.jpg');
+            await API.patch('/employees/me/update/', formData);
+            await fetchProfileData();
+            // Sync profile picture globally (sidebar etc.)
+            const empRes = await API.get('/employees/me/');
+            if (empRes.data?.profile_picture) setProfilePic(empRes.data.profile_picture);
+            setCropImage(null);
+        } catch (err) {
+            console.error('Upload error:', err);
+            alert('Failed to upload picture');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     return (
         <div className="max-w-5xl mx-auto animate-fade-in space-y-6">
@@ -113,11 +176,78 @@ export default function Profile() {
                 <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
 
                 <div className="relative flex flex-col md:flex-row items-center md:items-start gap-8 border-b border-white/10 pb-8 mb-8">
-                    <img
-                        src={avatarUrl}
-                        alt={user?.username}
-                        className="w-28 h-28 rounded-2xl shadow-xl border-2 border-white/10 object-cover shrink-0 bg-[#0F172A]"
-                    />
+                    <div className="relative group">
+                        <img
+                            src={avatarUrl}
+                            alt={user?.username}
+                            onClick={() => setShowPreview(true)}
+                            className="w-28 h-28 rounded-2xl shadow-xl border-2 border-white/10 object-cover shrink-0 bg-[#0F172A] cursor-pointer hover:brightness-110 transition"
+                        />
+                        {isEditing && (
+                            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                <Edit2 className="w-5 h-5 text-white" />
+                                <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                            </label>
+                        )}
+                    </div>
+
+                    {/* Full-size Image Preview */}
+                    {showPreview && (
+                        <div
+                            className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center cursor-pointer animate-fade-in"
+                            onClick={() => setShowPreview(false)}
+                        >
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                <img
+                                    src={avatarUrl}
+                                    alt={user?.username}
+                                    className="max-w-[90vw] max-h-[80vh] rounded-2xl shadow-2xl object-contain"
+                                />
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="absolute -top-3 -right-3 w-8 h-8 bg-white/10 hover:bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Crop Modal */}
+                    {cropImage && (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center animate-fade-in">
+                            <div className="relative w-[90vw] max-w-md h-[70vh] max-h-[400px]">
+                                <Cropper
+                                    image={cropImage}
+                                    crop={crop}
+                                    zoom={zoom}
+                                    aspect={1}
+                                    cropShape="round"
+                                    onCropChange={setCrop}
+                                    onZoomChange={setZoom}
+                                    onCropComplete={onCropComplete}
+                                />
+                            </div>
+                            <div className="flex items-center gap-4 mt-6">
+                                <input
+                                    type="range" min={1} max={3} step={0.05} value={zoom}
+                                    onChange={(e) => setZoom(Number(e.target.value))}
+                                    className="w-40 accent-[#2563EB]"
+                                />
+                            </div>
+                            <div className="flex gap-3 mt-5">
+                                <button
+                                    onClick={() => setCropImage(null)}
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 transition-colors"
+                                >Cancel</button>
+                                <button
+                                    onClick={handleCropSave}
+                                    disabled={uploading}
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] shadow-lg shadow-[#2563EB]/30 transition-all disabled:opacity-50"
+                                >{uploading ? 'Saving...' : 'Save'}</button>
+                            </div>
+                        </div>
+                    )}
                     <div className="text-center md:text-left flex-1 min-w-0 flex flex-col justify-center h-full pt-1">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
@@ -128,13 +258,6 @@ export default function Profile() {
                                 </p>
                             </div>
                             <div className="flex gap-3 justify-center md:justify-end">
-                                <Link
-                                    to="/leaves"
-                                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-white bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.3)] transition-all hover:-translate-y-0.5 border border-[#2563EB]"
-                                >
-                                    <CalendarPlus className="w-4 h-4" strokeWidth={2.5} />
-                                    Apply for Leave
-                                </Link>
                                 <button
                                     onClick={handleEditToggle}
                                     className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-all shadow-sm border ${isEditing
@@ -165,7 +288,7 @@ export default function Profile() {
                             {employee?.department && (
                                 <span className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold tracking-wider text-slate-200">
                                     <Building2 className="w-4 h-4 text-amber-400" />
-                                    Dept: {typeof employee.department === 'object' ? employee.department?.name : employee.department}
+                                    Dept: {employee?.department_name || 'Unassigned'}
                                 </span>
                             )}
                         </div>

@@ -13,8 +13,18 @@ export function AuthProvider({ children }) {
         return saved ? JSON.parse(saved) : null;
     });
     const [loading, setLoading] = useState(false);
+    const [profilePic, setProfilePic] = useState(null);
 
     const isAuthenticated = !!tokens?.access;
+
+    // Fetch profile picture on app load
+    useEffect(() => {
+        if (isAuthenticated) {
+            API.get('/employees/me/')
+                .then(res => { if (res.data?.profile_picture) setProfilePic(res.data.profile_picture); })
+                .catch(() => { });
+        }
+    }, [isAuthenticated]);
 
     // Login
     const login = async (username, password) => {
@@ -29,6 +39,15 @@ export function AuthProvider({ children }) {
         });
         localStorage.setItem('user', JSON.stringify(profileRes.data));
         setUser(profileRes.data);
+
+        // Fetch profile picture
+        try {
+            const empRes = await API.get('/employees/me/', {
+                headers: { Authorization: `Bearer ${newTokens.access}` },
+            });
+            if (empRes.data?.profile_picture) setProfilePic(empRes.data.profile_picture);
+        } catch { }
+
         return profileRes.data;
     };
 
@@ -48,7 +67,7 @@ export function AuthProvider({ children }) {
 
     return (
         <AuthContext.Provider
-            value={{ user, tokens, isAuthenticated, loading, login, logout, hasRole }}
+            value={{ user, tokens, isAuthenticated, loading, login, logout, hasRole, profilePic, setProfilePic }}
         >
             {children}
         </AuthContext.Provider>

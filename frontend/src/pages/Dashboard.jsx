@@ -290,9 +290,11 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
                                 <div className="space-y-2.5">
                                     {(data.recently_added_employees || []).slice(0, 4).map((emp) => (
                                         <div key={emp.id} className="flex items-center gap-3">
-                                            <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold">
-                                                {emp.user__username.charAt(0).toUpperCase()}
-                                            </div>
+                                            <img
+                                                src={emp.profile_picture ? `/media/${emp.profile_picture}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user__username)}&size=56&background=F1F5F9&color=64748B&bold=true&font-size=0.45`}
+                                                alt={emp.user__username}
+                                                className="w-7 h-7 rounded-full object-cover bg-slate-100 shrink-0"
+                                            />
                                             <div>
                                                 <p className="text-xs font-semibold text-[#1A2B3C]">{emp.user__username}</p>
                                                 <p className="text-[9px] text-slate-400 uppercase tracking-wider">{emp.department__name || 'Unassigned'}</p>

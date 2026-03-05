@@ -30,13 +30,17 @@ export default function LeaveRequestList() {
     const [balanceSearch, setBalanceSearch] = useState('');
 
     // ─── Fetch leave requests ───
-    const fetchRequests = async () => {
+    const fetchRequests = async (currentTab) => {
         setLoading(true);
         try {
-            const endpoint = tab === 'my' ? '/leaves/requests/my/' : '/leaves/requests/';
+            const endpoint = currentTab === 'my' ? '/leaves/requests/my/' : '/leaves/requests/';
             const res = await API.get(endpoint);
-            setRequests(res.data.results ?? res.data);
-        } catch { } finally { setLoading(false); }
+            const data = res.data.results ?? res.data;
+            setRequests(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('[LeaveRequestList] Error:', err);
+            setRequests([]);
+        } finally { setLoading(false); }
     };
 
     // ─── Fetch balances (admin/hr only) ───
@@ -52,7 +56,7 @@ export default function LeaveRequestList() {
         if (tab === 'balances') {
             fetchBalances();
         } else {
-            fetchRequests();
+            fetchRequests(tab);
         }
     }, [tab]);
 
@@ -115,13 +119,15 @@ export default function LeaveRequestList() {
                     <h1 className="text-2xl font-bold text-[#1A2B3C] tracking-tight">Leave Management</h1>
                     <p className="text-sm text-slate-500 mt-1">Review, approve, and track employee absence requests.</p>
                 </div>
-                <Link
-                    to="/leaves/apply"
-                    className="flex items-center gap-2 bg-[#2563EB] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.25)] transition-all hover:-translate-y-0.5"
-                >
-                    <Plus className="w-4 h-4" strokeWidth={2.5} />
-                    Apply for Leave
-                </Link>
+                {!hasRole('admin') && (
+                    <Link
+                        to="/leaves/apply"
+                        className="flex items-center gap-2 bg-[#2563EB] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.25)] transition-all hover:-translate-y-0.5"
+                    >
+                        <Plus className="w-4 h-4" strokeWidth={2.5} />
+                        Apply for Leave
+                    </Link>
+                )}
             </div>
 
             {/* Tabs & Filters */}
@@ -211,9 +217,11 @@ export default function LeaveRequestList() {
                                         <tr key={b.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded bg-[#1A2B3C] text-white flex items-center justify-center text-xs font-bold">
-                                                        {(b.employee_name || 'U')[0].toUpperCase()}
-                                                    </div>
+                                                    <img
+                                                        src={b.employee_profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.employee_name || 'U')}&size=64&background=1A2B3C&color=fff&bold=true&font-size=0.45`}
+                                                        alt={b.employee_name}
+                                                        className="w-8 h-8 rounded object-cover bg-[#1A2B3C] shrink-0"
+                                                    />
                                                     <div>
                                                         <span className="text-sm font-semibold text-slate-800">{b.employee_name}</span>
                                                         <p className="text-[10px] text-slate-400 font-mono">{b.employee_code}</p>
@@ -307,9 +315,11 @@ export default function LeaveRequestList() {
                                         <tr key={req.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded bg-[#1A2B3C] text-white flex items-center justify-center text-xs font-bold">
-                                                        {(req.employee || 'U')[0].toUpperCase()}
-                                                    </div>
+                                                    <img
+                                                        src={req.employee_profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(req.employee || 'U')}&size=64&background=1A2B3C&color=fff&bold=true&font-size=0.45`}
+                                                        alt={req.employee}
+                                                        className="w-8 h-8 rounded object-cover bg-[#1A2B3C] shrink-0"
+                                                    />
                                                     <span className="text-sm font-semibold text-slate-800">{req.employee}</span>
                                                 </div>
                                             </td>

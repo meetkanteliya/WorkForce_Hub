@@ -13,6 +13,7 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source="employee.user.username", read_only=True)
     employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
     department_name = serializers.CharField(source="employee.department.name", read_only=True, default="Unassigned")
+    employee_profile_picture = serializers.ImageField(source="employee.profile_picture", read_only=True)
     remaining_days = serializers.SerializerMethodField()
 
     class Meta:
@@ -22,6 +23,7 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
             "employee_name",
             "employee_code",
             "department_name",
+            "employee_profile_picture",
             "leave_type",
             "year",
             "used_days",
@@ -44,12 +46,14 @@ class LeaveBalanceWriteSerializer(serializers.ModelSerializer):
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee = serializers.StringRelatedField(read_only=True)
     leave_type_name = serializers.CharField(source="leave_type.name", read_only=True)
+    employee_profile_picture = serializers.ImageField(source="employee.profile_picture", read_only=True)
 
     class Meta:
         model = LeaveRequest
         fields = (
             "id",
             "employee",
+            "employee_profile_picture",
             "leave_type",
             "leave_type_name",
             "start_date",

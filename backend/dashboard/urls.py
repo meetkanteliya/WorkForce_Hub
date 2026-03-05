@@ -8,6 +8,10 @@ from .views import (
     DashboardLeaveOverviewView,
     DashboardPayrollOverviewView,
     DashboardActivityView,
+    NotificationListView,
+    NotificationMarkReadView,
+    NotificationMarkAllReadView,
+    NotificationClearAllView,
 )
 
 urlpatterns = [
@@ -34,4 +38,10 @@ urlpatterns = [
 
     # 8. Activity feed
     path("activity/", DashboardActivityView.as_view(), name="dashboard-activity"),
+
+    # 9. Notifications
+    path("notifications/", NotificationListView.as_view(), name="notifications-list"),
+    path("notifications/<int:pk>/read/", NotificationMarkReadView.as_view(), name="notification-mark-read"),
+    path("notifications/read-all/", NotificationMarkAllReadView.as_view(), name="notifications-read-all"),
+    path("notifications/clear-all/", NotificationClearAllView.as_view(), name="notifications-clear-all"),
 ]

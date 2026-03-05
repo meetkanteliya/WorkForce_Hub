@@ -23,7 +23,7 @@ class DashboardEmployeeSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "role", "employee_code",
             "designation", "department", "department_name",
-            "phone", "date_of_joining", "date_joined",
+            "phone", "date_of_joining", "date_joined", "profile_picture",
         )
 
 
@@ -95,3 +95,12 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "id", "action_type", "actor_name", "target_name",
             "message", "metadata", "created_at",
         )
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Notification serializer for in-app notifications."""
+
+    class Meta:
+        from .models import Notification
+        model = Notification
+        fields = ("id", "message", "is_read", "link", "created_at")

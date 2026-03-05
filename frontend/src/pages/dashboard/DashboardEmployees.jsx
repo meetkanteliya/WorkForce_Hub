@@ -75,9 +75,11 @@ export default function DashboardEmployees() {
                                     <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                                                    {emp.username?.[0]?.toUpperCase()}
-                                                </div>
+                                                <img
+                                                    src={emp.profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.username || '?')}&size=64&background=6366F1&color=fff&bold=true&font-size=0.45`}
+                                                    alt={emp.username}
+                                                    className="w-8 h-8 rounded-lg object-cover bg-indigo-100 shrink-0"
+                                                />
                                                 <div>
                                                     <p className="text-sm font-medium text-gray-800">{emp.username}</p>
                                                     <p className="text-xs text-gray-400">{emp.email}</p>

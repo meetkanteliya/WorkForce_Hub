@@ -12,7 +12,7 @@ from .serializers import (
     LeaveBalanceWriteSerializer,
 )
 from accounts.permissions import IsAdmin, IsAdminOrHR, IsManagerOrAbove
-from dashboard.models import AuditLog
+from dashboard.models import AuditLog, Notification
 from datetime import datetime
 
 
@@ -31,19 +31,21 @@ class LeaveRequestViewSet(ModelViewSet):
     queryset = LeaveRequest.objects.select_related("employee", "leave_type")
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Return all records — client-side filtering
 
     def get_queryset(self):
         user = self.request.user
+        qs = self.queryset.all()
 
         if user.role in ["admin", "hr"]:
-            return self.queryset
+            return qs
 
         if user.role == "manager":
-            return self.queryset.filter(
+            return qs.filter(
                 employee__department=user.employee.department
             )
 
-        return self.queryset.filter(employee=user.employee)
+        return qs.filter(employee=user.employee)
 
     def perform_create(self, serializer):
         try:
@@ -116,6 +118,14 @@ class LeaveRequestViewSet(ModelViewSet):
             message=f"{request.user.username} approved {leave.leave_type.name} leave for {leave.employee.user.username}",
             metadata={"leave_request_id": leave.id, "days": days_requested},
         )
+
+        # Send notification to the employee
+        Notification.objects.create(
+            user=leave.employee.user,
+            message=f"Your {leave.leave_type.name} leave ({leave.start_date} to {leave.end_date}) has been approved by {request.user.username}.",
+            link="/leaves?tab=my",
+        )
+
         return Response({"status": "approved"})
 
     @action(detail=True, methods=["patch"], permission_classes=[IsManagerOrAbove])
@@ -150,6 +160,14 @@ class LeaveRequestViewSet(ModelViewSet):
             message=f"{request.user.username} rejected {leave.leave_type.name} leave for {leave.employee.user.username}",
             metadata={"leave_request_id": leave.id},
         )
+
+        # Send notification to the employee
+        Notification.objects.create(
+            user=leave.employee.user,
+            message=f"Your {leave.leave_type.name} leave ({leave.start_date} to {leave.end_date}) has been rejected by {request.user.username}.",
+            link="/leaves?tab=my",
+        )
+
         return Response({"status": "rejected"})
 
     @action(detail=False, methods=["get"], url_path="my")
@@ -167,6 +185,7 @@ class LeaveBalanceViewSet(ModelViewSet):
     queryset = LeaveBalance.objects.select_related("employee__user", "employee__department", "leave_type")
     serializer_class = LeaveBalanceSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Return all records — client-side filtering
 
     def get_serializer_class(self):
         if self.action in ["create", "update", "partial_update", "adjust"]:
@@ -182,7 +201,7 @@ class LeaveBalanceViewSet(ModelViewSet):
         user = self.request.user
         current_year = datetime.now().year
 
-        queryset = self.queryset.filter(year=current_year)
+        queryset = self.queryset.all().filter(year=current_year)
 
         if user.role in ["admin", "hr"]:
             return queryset

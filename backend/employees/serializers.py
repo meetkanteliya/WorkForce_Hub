@@ -25,6 +25,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
     role = serializers.CharField(write_only=True, required=False)
+    department_name = serializers.CharField(source="department.name", read_only=True, default="Unassigned")
 
     class Meta:
         model = Employee
@@ -38,6 +39,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "role",
             "employee_code",
             "department",
+            "department_name",
             "phone",
             "designation",
             "date_of_joining",
@@ -45,6 +47,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "city",
             "emergency_contact_name",
             "emergency_contact_phone",
+            "profile_picture",
         )
 
     def create(self, validated_data):
@@ -96,7 +99,8 @@ class EmployeeProfileUpdateSerializer(serializers.ModelSerializer):
             "employee_code",
             "designation",
             "date_of_joining",
-            "department_id"
+            "department_id",
+            "profile_picture",
         )
         
     def update(self, instance, validated_data):
@@ -107,7 +111,8 @@ class EmployeeProfileUpdateSerializer(serializers.ModelSerializer):
         if role == 'employee':
             allowed_fields = [
                 'phone', 'address', 'city', 
-                'emergency_contact_name', 'emergency_contact_phone', 'email'
+                'emergency_contact_name', 'emergency_contact_phone', 'email',
+                'profile_picture'
             ]
             for key in list(validated_data.keys()):
                 if key not in allowed_fields:

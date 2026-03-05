@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import API from '../api/axios';
 import {
     LayoutDashboard,
     Users,
@@ -12,6 +13,9 @@ import {
     Menu,
     X,
     KeyRound,
+    Bell,
+    CheckCheck,
+    Trash2,
 } from 'lucide-react';
 
 const navItems = [
@@ -26,15 +30,72 @@ const navItems = [
 ];
 
 export default function Layout() {
-    const { user, logout } = useAuth();
+    const { user, logout, profilePic } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // Notification state
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const notifRef = useRef(null);
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
+
+    // Fetch notifications
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const res = await API.get('/dashboard/notifications/');
+            setNotifications(res.data.results || []);
+            setUnreadCount(res.data.unread_count || 0);
+        } catch { }
+    }, []);
+
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, [fetchNotifications]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (notifRef.current && !notifRef.current.contains(e.target)) {
+                setNotifOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const markAsRead = async (id) => {
+        try {
+            await API.patch(`/dashboard/notifications/${id}/read/`);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch { }
+    };
+
+    const markAllAsRead = async () => {
+        try {
+            await API.patch('/dashboard/notifications/read-all/');
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setUnreadCount(0);
+        } catch { }
+    };
+
+    const clearAllNotifications = async () => {
+        try {
+            await API.delete('/dashboard/notifications/clear-all/');
+            setNotifications([]);
+            setUnreadCount(0);
+        } catch { }
+    };
+
 
     const filteredNav = navItems.filter(
         (item) => !item.roles || item.roles.includes(user?.role)
@@ -87,7 +148,7 @@ export default function Layout() {
                 {/* Navigation */}
                 <nav className="flex-1 mt-6 px-4 overflow-y-auto space-y-1">
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-2 mb-3">Menu</p>
-                    {filteredNav.map((item, idx) => {
+                    {filteredNav.map((item) => {
                         const Icon = item.icon;
                         const active = location.pathname === item.to || (item.to !== '/dashboard' && location.pathname.startsWith(item.to));
                         return (
@@ -112,9 +173,11 @@ export default function Layout() {
                 <div className="p-4 border-t border-white/5 mt-auto">
                     <div className="bg-black/20 rounded-lg p-3 mb-2 flex items-center justify-between border border-white/5">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded bg-[#2563EB]/20 flex items-center justify-center text-[#2563EB] font-bold text-xs ring-1 ring-[#2563EB]/30">
-                                {user?.username?.[0]?.toUpperCase() || 'U'}
-                            </div>
+                            <img
+                                src={profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.username || 'U')}&size=64&background=2563EB&color=fff&bold=true&font-size=0.45`}
+                                alt={user?.username}
+                                className="w-8 h-8 rounded object-cover bg-[#2563EB]/20 ring-1 ring-[#2563EB]/30 shrink-0"
+                            />
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-slate-200 truncate">{user?.username || 'User'}</p>
                                 <p className="text-[11px] text-slate-500 capitalize font-medium">{user?.role || 'Guest'}</p>
@@ -152,7 +215,7 @@ export default function Layout() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="hidden md:flex relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -165,6 +228,78 @@ export default function Layout() {
                                 placeholder="Search..."
                             />
                         </div>
+
+                        {/* Notification Bell */}
+                        <div className="relative" ref={notifRef}>
+                            <button
+                                onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifications(); }}
+                                className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                title="Notifications"
+                            >
+                                <Bell className="w-5 h-5" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Notification Dropdown */}
+                            {notifOpen && (
+                                <div className="absolute right-0 mt-2 w-96 max-h-[480px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                                        <span className="text-sm font-bold text-slate-800">Notifications</span>
+                                        <div className="flex items-center gap-3">
+                                            {unreadCount > 0 && (
+                                                <button
+                                                    onClick={markAllAsRead}
+                                                    className="flex items-center gap-1 text-[11px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] transition-colors"
+                                                >
+                                                    <CheckCheck className="w-3.5 h-3.5" />
+                                                    Mark all read
+                                                </button>
+                                            )}
+                                            {notifications.length > 0 && (
+                                                <button
+                                                    onClick={clearAllNotifications}
+                                                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 transition-colors"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    All Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="overflow-y-auto max-h-[400px] divide-y divide-slate-100">
+                                        {notifications.length === 0 ? (
+                                            <div className="p-8 text-center text-slate-400">
+                                                <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                                <p className="text-sm font-medium">No notifications yet</p>
+                                            </div>
+                                        ) : (
+                                            notifications.map((n) => (
+                                                <div
+                                                    key={n.id}
+                                                    onClick={() => { if (!n.is_read) markAsRead(n.id); if (n.link) { navigate(n.link); setNotifOpen(false); } }}
+                                                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                                                >
+                                                    <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.is_read ? 'bg-[#2563EB]' : 'bg-slate-200'}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[13px] leading-snug ${!n.is_read ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
+                                                            {n.message}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                                                            {new Date(n.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-md">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             <span className="text-[11px] font-semibold text-emerald-700 tracking-wide">JWT SECURED</span>

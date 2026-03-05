@@ -2,6 +2,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import Employee, Department
 from .serializers import EmployeeSerializer, DepartmentSerializer
@@ -19,17 +20,19 @@ class EmployeeViewSet(ModelViewSet):
     queryset = Employee.objects.select_related("user", "department")
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # Return all records
 
     def get_queryset(self):
         user = self.request.user
+        qs = self.queryset.all()
 
         if user.role in ["admin", "hr"]:
-            return self.queryset
+            return qs
 
         if user.role == "manager":
-            return self.queryset.filter(department=user.employee.department)
+            return qs.filter(department=user.employee.department)
 
-        return self.queryset.filter(user=user)
+        return qs.filter(user=user)
 
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update"]:
@@ -76,7 +79,7 @@ class EmployeeViewSet(ModelViewSet):
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["patch"], url_path="me/update")
+    @action(detail=False, methods=["patch"], url_path="me/update", parser_classes=[MultiPartParser, FormParser, JSONParser])
     def me_update(self, request):
         employee = Employee.objects.get(user=request.user)
         from .serializers import EmployeeProfileUpdateSerializer

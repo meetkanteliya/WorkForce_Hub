@@ -54,7 +54,8 @@ export default function EmployeeDetail() {
 
     const username = employee.user?.username || 'Unknown User';
     const email = employee.user?.email || 'No email registered';
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&size=128&background=1A2B3C&color=fff&bold=true&font-size=0.4`;
+    const avatarUrl = employee?.profile_picture
+        || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&size=128&background=1A2B3C&color=fff&bold=true&font-size=0.4`;
 
     return (
         <div className="max-w-5xl mx-auto animate-fade-in space-y-6 pb-12">
@@ -109,7 +110,7 @@ export default function EmployeeDetail() {
                             {employee.department && (
                                 <span className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold tracking-wider text-slate-200">
                                     <Building2 className="w-4 h-4 text-amber-400" />
-                                    Dept: {typeof employee.department === 'object' ? employee.department?.name : employee.department}
+                                    Dept: {employee.department_name || 'Unassigned'}
                                 </span>
                             )}
                         </div>
@@ -167,7 +168,7 @@ export default function EmployeeDetail() {
                         <InfoRow icon={BadgeCheck} label="Employee ID" value={employee.employee_code || '—'} />
                         <InfoRow icon={BriefcaseBusiness} label="Current Designation" value={employee.designation || '—'} />
                         <InfoRow icon={Building2} label="Assigned Department" value={
-                            typeof employee.department === 'object' ? employee.department?.name : employee.department || '—'
+                            employee.department_name || '—'
                         } />
                         <InfoRow icon={Calendar} label="Date of Joining" value={employee.date_of_joining || '—'} />
                     </div>

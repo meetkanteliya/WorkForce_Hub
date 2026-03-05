@@ -31,6 +31,7 @@ class Employee(models.Model):
     city = models.CharField(max_length=100, blank=True)
     emergency_contact_name = models.CharField(max_length=100, blank=True)
     emergency_contact_phone = models.CharField(max_length=15, blank=True)
+    profile_picture = models.ImageField(upload_to="profile_pics/", null=True, blank=True)
 
     def __str__(self):
         return self.user.username
