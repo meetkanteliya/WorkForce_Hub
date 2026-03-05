@@ -68,14 +68,14 @@ export default function App() {
             <Route path="payroll/:id/edit" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
             <Route path="my-salary" element={<MySalary />} />
 
-            {/* Dashboard Drill-down Pages (Admin) */}
-            <Route path="dashboard/employees" element={<ProtectedRoute roles={['admin']}><DashboardEmployees /></ProtectedRoute>} />
-            <Route path="dashboard/departments" element={<ProtectedRoute roles={['admin']}><DashboardDepartments /></ProtectedRoute>} />
-            <Route path="dashboard/departments/:id" element={<ProtectedRoute roles={['admin']}><DashboardDepartments /></ProtectedRoute>} />
-            <Route path="dashboard/leaves-pending" element={<ProtectedRoute roles={['admin']}><DashboardLeavesPending /></ProtectedRoute>} />
-            <Route path="dashboard/leave-overview" element={<ProtectedRoute roles={['admin']}><DashboardLeaveOverview /></ProtectedRoute>} />
-            <Route path="dashboard/payroll" element={<ProtectedRoute roles={['admin']}><DashboardPayroll /></ProtectedRoute>} />
-            <Route path="dashboard/activity" element={<ProtectedRoute roles={['admin']}><DashboardActivity /></ProtectedRoute>} />
+            {/* Dashboard Drill-down Pages (Admin & HR) */}
+            <Route path="dashboard/employees" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardEmployees /></ProtectedRoute>} />
+            <Route path="dashboard/departments" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
+            <Route path="dashboard/departments/:id" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
+            <Route path="dashboard/leaves-pending" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeavesPending /></ProtectedRoute>} />
+            <Route path="dashboard/leave-overview" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeaveOverview /></ProtectedRoute>} />
+            <Route path="dashboard/payroll" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardPayroll /></ProtectedRoute>} />
+            <Route path="dashboard/activity" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardActivity /></ProtectedRoute>} />
           </Route>
 
           {/* Catch-all */}

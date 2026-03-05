@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
@@ -18,59 +18,77 @@ import {
     Settings,
     ShieldCheck,
     ChevronRight,
-    MinusCircle
+    MinusCircle,
+    RefreshCw,
+    Wifi
 } from 'lucide-react';
+
+const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 export default function Dashboard() {
     const { user, hasRole } = useAuth();
     const [loading, setLoading] = useState(true);
-    // Combine data state for admin (real API) and mock data for Employee/Manager specific UI.
     const [data, setData] = useState(null);
     const [mockData, setMockData] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const intervalRef = useRef(null);
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            if (hasRole('admin')) {
-                try {
-                    const res = await API.get('/dashboard/summary/');
-                    setData(res.data);
-                } catch (err) {
-                    console.error("Failed to load dashboard data", err);
-                } finally {
-                    setLoading(false);
-                }
-            } else {
-                // Since strict hours tracking and punch events are not in the backend model yet,
-                // we generate realistic structured mock data specifically for this UI assignment.
-                setTimeout(() => {
-                    if (hasRole('hr', 'manager')) {
-                        setMockData({
-                            type: 'manager',
-                            team: [
-                                { id: 1, name: 'John Doe', role: 'employee', login: '09:00 AM', logout: '06:30 PM', hoursWorked: 9.5, assignedLeaves: 20, usedLeaves: 5 },
-                                { id: 2, name: 'Jane Smith', role: 'employee', login: '09:15 AM', logout: '05:15 PM', hoursWorked: 8.0, assignedLeaves: 20, usedLeaves: 2 },
-                                { id: 3, name: 'Mike Ross', role: 'employee', login: '08:45 AM', logout: '07:45 PM', hoursWorked: 11.0, assignedLeaves: 20, usedLeaves: 10 },
-                                { id: 4, name: 'Sarah Jane', role: 'manager', login: '09:30 AM', logout: '---', hoursWorked: 6.5, assignedLeaves: 24, usedLeaves: 4 },
-                            ]
-                        });
-                    } else {
-                        setMockData({
-                            type: 'employee',
-                            assignedLeaves: 20,
-                            usedLeaves: 4,
-                            today: {
-                                login: '09:00 AM',
-                                logout: '06:15 PM',
-                                hoursWorked: 9.25,
-                            }
-                        });
-                    }
-                    setLoading(false);
-                }, 500);
+    const fetchDashboardData = useCallback(async (silent = false) => {
+        if (hasRole('admin', 'hr')) {
+            try {
+                if (!silent) setLoading(true);
+                else setIsRefreshing(true);
+                const res = await API.get('/dashboard/summary/');
+                setData(res.data);
+            } catch (err) {
+                console.error("Failed to load dashboard data", err);
+            } finally {
+                setLoading(false);
+                setIsRefreshing(false);
             }
-        };
-        fetchDashboardData();
+        } else {
+            setTimeout(() => {
+                if (hasRole('manager')) {
+                    setMockData({
+                        type: 'manager',
+                        team: [
+                            { id: 1, name: 'John Doe', role: 'employee', login: '09:00 AM', logout: '06:30 PM', hoursWorked: 9.5, assignedLeaves: 20, usedLeaves: 5 },
+                            { id: 2, name: 'Jane Smith', role: 'employee', login: '09:15 AM', logout: '05:15 PM', hoursWorked: 8.0, assignedLeaves: 20, usedLeaves: 2 },
+                            { id: 3, name: 'Mike Ross', role: 'employee', login: '08:45 AM', logout: '07:45 PM', hoursWorked: 11.0, assignedLeaves: 20, usedLeaves: 10 },
+                            { id: 4, name: 'Sarah Jane', role: 'manager', login: '09:30 AM', logout: '---', hoursWorked: 6.5, assignedLeaves: 24, usedLeaves: 4 },
+                        ]
+                    });
+                } else {
+                    setMockData({
+                        type: 'employee',
+                        assignedLeaves: 20,
+                        usedLeaves: 4,
+                        today: {
+                            login: '09:00 AM',
+                            logout: '06:15 PM',
+                            hoursWorked: 9.25,
+                        }
+                    });
+                }
+                setLoading(false);
+            }, 500);
+        }
     }, [hasRole]);
+
+    // Initial fetch + live polling
+    useEffect(() => {
+        fetchDashboardData(false);
+
+        if (hasRole('admin', 'hr')) {
+            intervalRef.current = setInterval(() => {
+                fetchDashboardData(true);
+            }, POLL_INTERVAL_MS);
+        }
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [fetchDashboardData, hasRole]);
 
     if (loading) {
         return (
@@ -80,8 +98,8 @@ export default function Dashboard() {
         );
     }
 
-    if (hasRole('admin') && data) {
-        return <AdminDashboard data={data} user={user} />;
+    if (hasRole('admin', 'hr') && data) {
+        return <AdminDashboard data={data} user={user} isRefreshing={isRefreshing} onRefresh={() => fetchDashboardData(true)} />;
     }
 
     if (mockData?.type === 'manager') {
@@ -95,25 +113,43 @@ export default function Dashboard() {
     return null;
 }
 
-// ----------------------------------------------------------------------
-// SUB-COMPONENTS: ADMIN DASHBOARD (RESTORED)
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────
+// ADMIN / HR DASHBOARD — Professional, Live-Updating
+// ──────────────────────────────────────────────────────────────────────
 
-function AdminDashboard({ data }) {
+function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
+    const roleLabel = user?.role === 'hr' ? 'HR' : 'Admin';
+    const lastUpdated = data.last_updated
+        ? new Date(data.last_updated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : null;
+
     return (
         <div className="max-w-7xl mx-auto animate-fade-in pb-12">
 
-            {/* Minimal Header */}
+            {/* Header with Live Status */}
             <div className="flex justify-between items-end mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-[#1A2B3C] tracking-tight">Admin Dashboard</h1>
-                    <p className="text-sm text-slate-500 mt-1">System overview and executive controls.</p>
+                    <h1 className="text-2xl font-bold text-[#1A2B3C] tracking-tight">{roleLabel} Dashboard</h1>
+                    <p className="text-sm text-slate-500 mt-1">Real-time system overview and executive controls.</p>
                 </div>
-                <div className="hidden sm:flex flex-col items-end gap-1">
+                <div className="hidden sm:flex flex-col items-end gap-1.5">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                        <Activity className="w-3.5 h-3.5" />
-                        System Active
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Live
                     </span>
+                    {lastUpdated && (
+                        <button
+                            onClick={onRefresh}
+                            className="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-400 hover:text-[#2563EB] transition-colors cursor-pointer"
+                            title="Click to refresh now"
+                        >
+                            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            Updated {lastUpdated}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -121,177 +157,201 @@ function AdminDashboard({ data }) {
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Core Metrics</h2>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 <KPICard icon={Users} label="Total Staff" value={data.total_employees} />
-                <KPICard icon={UserCheck} label="Active" value={data.active_employees} color="text-emerald-600" />
-                <KPICard icon={CalendarX2} label="On Leave" value={data.employees_on_leave_today} color="text-amber-600" />
-                <KPICard icon={AlertCircle} label="Pending Req" value={data.pending_requests_total} color="text-rose-600" />
+                <KPICard icon={UserCheck} label="Working Today" value={data.present_today} color="text-emerald-600" highlight="emerald" />
+                <KPICard icon={CalendarX2} label="On Leave" value={data.employees_on_leave_today} color="text-amber-600" highlight="amber" />
+                <KPICard icon={AlertCircle} label="Pending Req" value={data.pending_requests_total} color="text-rose-600" highlight="rose" />
                 <KPICard icon={Building2} label="Departments" value={data.total_departments} />
             </div>
 
+            {/* 2. ATTENDANCE & LEAVE OVERVIEW + ORG SNAPSHOT */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
 
-                {/* 2. ATTENDANCE & LEAVE OVERVIEW */}
+                {/* Attendance & Leave Overview */}
                 <div className="xl:col-span-1 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col">
                     <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
                         <Clock className="w-4 h-4 text-slate-400" />
                         Today's Attendance
                     </h2>
                     <div className="space-y-4 flex-1">
-                        <MetricRow label="Present Today" value={data.present_today} highlight="text-emerald-600" />
-                        <MetricRow label="Absent Today" value={data.absent_today} />
-                        <MetricRow label="Late Check-ins" value={data.late_checkins} />
+                        <MetricRow label="Total Employees" value={data.total_employees} />
+                        <MetricRow label="Working Today" value={data.present_today} highlight="text-emerald-600" />
                         <div className="h-px bg-slate-100 my-2" />
                         <MetricRow label="On Leave Today" value={data.employees_on_leave_today} highlight="text-amber-600" />
                         <MetricRow label="Upcoming Leaves (7d)" value={data.upcoming_leaves} />
+                        <MetricRow label="Pending Requests" value={data.pending_requests_total} highlight="text-rose-600" />
+                    </div>
+
+                    {/* Working vs Absent Mini Visual */}
+                    <div className="mt-5 pt-4 border-t border-slate-100">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Workforce Status</span>
+                        </div>
+                        <div className="flex h-3 rounded-full overflow-hidden bg-slate-100">
+                            {data.total_employees > 0 && (
+                                <>
+                                    <div
+                                        className="bg-emerald-500 h-full transition-all duration-700"
+                                        style={{ width: `${(data.present_today / data.total_employees) * 100}%` }}
+                                        title={`Working: ${data.present_today}`}
+                                    />
+                                    <div
+                                        className="bg-amber-400 h-full transition-all duration-700"
+                                        style={{ width: `${(data.employees_on_leave_today / data.total_employees) * 100}%` }}
+                                        title={`On Leave: ${data.employees_on_leave_today}`}
+                                    />
+                                </>
+                            )}
+                        </div>
+                        <div className="flex gap-4 mt-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-slate-500">Working ({data.present_today})</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                <span className="text-slate-500">On Leave ({data.employees_on_leave_today})</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* 3. APPROVAL QUEUE */}
-                <div className="xl:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col">
-                    <div className="flex justify-between items-center mb-5">
-                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-rose-500" />
-                            Action Queue
+                {/* Employee Snapshot + Leave Counts */}
+                <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* Leave Status Counts */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
+                            <CalendarDays className="w-4 h-4 text-slate-400" />
+                            Leave Status
                         </h2>
-                        <Link to="/leaves" className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1">
-                            View All <ChevronRight className="w-3 h-3" />
-                        </Link>
+                        <div className="space-y-4">
+                            <Link to="/leaves?status=pending" className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100 hover:ring-2 hover:ring-amber-200 transition-all cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                                    <span className="text-sm font-semibold text-amber-800">Pending</span>
+                                </div>
+                                <span className="text-xl font-black text-amber-700">{data.leave_counts?.pending ?? 0}</span>
+                            </Link>
+                            <Link to="/leaves?status=approved" className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-100 hover:ring-2 hover:ring-emerald-200 transition-all cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span className="text-sm font-semibold text-emerald-800">Approved</span>
+                                </div>
+                                <span className="text-xl font-black text-emerald-700">{data.leave_counts?.approved ?? 0}</span>
+                            </Link>
+                            <Link to="/leaves?status=rejected" className="flex items-center justify-between p-3 bg-rose-50 rounded-lg border border-rose-100 hover:ring-2 hover:ring-rose-200 transition-all cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                    <XCircle className="w-4 h-4 text-rose-600" />
+                                    <span className="text-sm font-semibold text-rose-800">Rejected</span>
+                                </div>
+                                <span className="text-xl font-black text-rose-700">{data.leave_counts?.rejected ?? 0}</span>
+                            </Link>
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-auto custom-scrollbar">
-                        {data.approval_queue?.pending_leaves?.length > 0 ? (
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider text-[10px]">
-                                        <th className="pb-3 font-semibold">Employee</th>
-                                        <th className="pb-3 font-semibold">Request Type</th>
-                                        <th className="pb-3 font-semibold">Date Submitted</th>
-                                        <th className="pb-3 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.approval_queue.pending_leaves.map((req) => (
-                                        <tr key={req.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                                            <td className="py-3 font-medium text-[#1A2B3C]">{req.employee__user__username}</td>
-                                            <td className="py-3">
-                                                <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
-                                                    {req.leave_type__name} Leave
-                                                </span>
-                                            </td>
-                                            <td className="py-3 text-slate-500 text-xs">
-                                                {new Date(req.created_at).toLocaleDateString('en-GB')}
-                                            </td>
-                                            <td className="py-3 text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors" title="Approve">
-                                                        <CheckCircle2 className="w-4 h-4" />
-                                                    </button>
-                                                    <button className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 transition-colors" title="Reject">
-                                                        <XCircle className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2 py-8">
-                                <CheckCircle2 className="w-8 h-8 text-emerald-200" />
-                                <span className="text-sm font-medium">All caught up! No pending approvals.</span>
+                    {/* Organization Snapshot */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
+                            <Users className="w-4 h-4 text-[#2563EB]" />
+                            Organization
+                        </h2>
+
+                        <div className="space-y-5">
+                            {/* Role Distribution Bar */}
+                            <div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">By Role</span>
+                                <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 mt-2">
+                                    {Object.entries(data.role_distribution || {}).map(([role, count]) => {
+                                        const total = Object.values(data.role_distribution).reduce((a, b) => a + b, 0);
+                                        const pct = total ? (count / total) * 100 : 0;
+                                        const colors = { admin: 'bg-[#1A2B3C]', hr: 'bg-emerald-500', manager: 'bg-amber-500', employee: 'bg-[#2563EB]' };
+                                        return <div key={role} style={{ width: `${pct}%` }} className={`${colors[role] || 'bg-slate-400'} h-full`} title={`${role}: ${count}`} />;
+                                    })}
+                                </div>
+                                <div className="flex flex-wrap gap-3 mt-2">
+                                    {Object.entries(data.role_distribution || {}).map(([role, count]) => {
+                                        const colors = { admin: 'text-[#1A2B3C]', hr: 'text-emerald-600', manager: 'text-amber-600', employee: 'text-[#2563EB]' };
+                                        return (
+                                            <div key={role} className="flex items-center gap-1.5 text-[10px] font-semibold capitalize">
+                                                <div className={`w-2 h-2 rounded-full ${colors[role]?.replace('text-', 'bg-') || 'bg-slate-400'}`} />
+                                                <span className="text-slate-600">{role} <span className="text-slate-400">({count})</span></span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        )}
+
+                            {/* Recent Additions */}
+                            <div>
+                                <div className="flex justify-between items-center mb-3">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">New Joiners</span>
+                                    <span className="text-xs font-bold text-[#2563EB]">{data.new_joiners_this_month} this month</span>
+                                </div>
+                                <div className="space-y-2.5">
+                                    {(data.recently_added_employees || []).slice(0, 4).map((emp) => (
+                                        <div key={emp.id} className="flex items-center gap-3">
+                                            <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold">
+                                                {emp.user__username.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-semibold text-[#1A2B3C]">{emp.user__username}</p>
+                                                <p className="text-[9px] text-slate-400 uppercase tracking-wider">{emp.department__name || 'Unassigned'}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {/* 3. BOTTOM ROW: Audit Log + Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* 4. EMPLOYEE MANAGEMENT SNAPSHOT */}
-                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                    <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
-                        <Users className="w-4 h-4 text-[#2563EB]" />
-                        Organization Snapshot
-                    </h2>
-
-                    <div className="space-y-6">
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-xs font-bold text-slate-500 uppercase">By Role</span>
-                            </div>
-                            <div className="flex h-3 rounded-full overflow-hidden bg-slate-100">
-                                {Object.entries(data.role_distribution || {}).map(([role, count]) => {
-                                    const total = Object.values(data.role_distribution).reduce((a, b) => a + b, 0);
-                                    const pct = total ? (count / total) * 100 : 0;
-                                    const colors = { admin: 'bg-[#1A2B3C]', hr: 'bg-emerald-500', manager: 'bg-amber-500', employee: 'bg-[#2563EB]' };
-                                    return <div key={role} style={{ width: `${pct}%` }} className={`${colors[role] || 'bg-slate-400'} h-full`} title={`${role}: ${count}`} />;
-                                })}
-                            </div>
-                            <div className="flex flex-wrap gap-3 mt-3">
-                                {Object.entries(data.role_distribution || {}).map(([role, count]) => {
-                                    const colors = { admin: 'text-[#1A2B3C]', hr: 'text-emerald-600', manager: 'text-amber-600', employee: 'text-[#2563EB]' };
-                                    return (
-                                        <div key={role} className="flex items-center gap-1.5 text-xs font-semibold capitalize">
-                                            <div className={`w-2 h-2 rounded-full ${colors[role]?.replace('text-', 'bg-') || 'bg-slate-400'}`} />
-                                            <span className="text-slate-600">{role} <span className="text-slate-400">({count})</span></span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-xs font-bold text-slate-500 uppercase">Recent Additions</span>
-                                <Link to="/employees" className="text-[10px] font-bold text-[#2563EB] hover:underline">View Directory</Link>
-                            </div>
-                            <div className="space-y-3">
-                                {(data.recently_added_employees || []).map((emp) => (
-                                    <div key={emp.id} className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold">
-                                                {emp.user__username.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-[#1A2B3C]">{emp.user__username}</p>
-                                                <p className="text-[10px] text-slate-500 uppercase tracking-wider">{emp.department__name || 'Unassigned'}</p>
-                                            </div>
+                {/* Audit Log */}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                    <div className="flex justify-between items-center mb-5">
+                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-slate-400" />
+                            Audit Log
+                        </h2>
+                        <Link to="/dashboard/activity" className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1">
+                            View All <ChevronRight className="w-3 h-3" />
+                        </Link>
+                    </div>
+                    <div className="space-y-1 max-h-[340px] overflow-y-auto custom-scrollbar pr-2">
+                        {(data.recent_activity || []).length > 0 ? (
+                            data.recent_activity.map((act, i) => (
+                                <div key={act.id || i} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-slate-50 transition-colors">
+                                    <AuditIcon type={act.action_type} />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-700 leading-snug">{act.message}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] text-slate-400 font-medium">
+                                                {act.actor_name && <span className="text-slate-500 font-semibold">{act.actor_name}</span>}
+                                                {act.actor_name && ' · '}
+                                                {new Date(act.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            </span>
                                         </div>
                                     </div>
-                                ))}
+                                    <AuditBadge type={act.action_type} />
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
+                                <Activity className="w-8 h-8 text-slate-200" />
+                                <span className="text-sm font-medium">No activity recorded yet.</span>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                {/* 5. RECENT ACTIVITY LOG */}
-                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                    <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
-                        <Activity className="w-4 h-4 text-slate-400" />
-                        Audit Log
-                    </h2>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                        {(data.recent_activity || []).map((act, i) => (
-                            <div key={i} className="flex gap-3">
-                                <div className="flex flex-col items-center">
-                                    <div className="w-2 h-2 rounded-full bg-slate-300 mt-1.5" />
-                                    {i !== data.recent_activity.length - 1 && <div className="w-px h-full bg-slate-100 my-1" />}
-                                </div>
-                                <div className="pb-3">
-                                    <p className="text-sm font-medium text-slate-700">{act.message}</p>
-                                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-1">
-                                        {new Date(act.timestamp).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* 6. QUICK ACTIONS PANEL */}
+                {/* Quick Actions */}
                 <div className="bg-[#1A2B3C] border border-[#1A2B3C] rounded-xl p-5 shadow-lg text-white flex flex-col">
                     <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2 mb-5">
                         <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
-                        Admin Controls
+                        Quick Actions
                     </h2>
                     <div className="grid grid-cols-1 gap-3">
                         <QuickActionLink to="/employees/new" icon={UserPlus} label="Add New Employee" />
@@ -307,9 +367,9 @@ function AdminDashboard({ data }) {
     );
 }
 
-// ----------------------------------------------------------------------
-// SUB-COMPONENTS: EMPLOYEE DASHBOARD
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────
+// EMPLOYEE DASHBOARD
+// ──────────────────────────────────────────────────────────────────────
 
 function EmployeeDashboard({ data }) {
     const remainingLeaves = data.assignedLeaves - data.usedLeaves;
@@ -353,7 +413,7 @@ function EmployeeDashboard({ data }) {
                 </div>
 
                 <div className="md:col-span-2 flex flex-col gap-6">
-                    {/* 2, 3, 4, 5. WORK HOURS TRACKING & PROGRESS */}
+                    {/* 2. WORK HOURS TRACKING */}
                     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm relative overflow-hidden">
                         {overtimeHours > 0 && (
                             <div className="absolute top-0 right-0 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-3 py-1.5 rounded-bl-xl flex items-center gap-1 border-b border-l border-emerald-100">
@@ -381,7 +441,6 @@ function EmployeeDashboard({ data }) {
                             </div>
                         </div>
 
-                        {/* Progress Bar Area */}
                         <div className="mb-2 flex justify-between items-end">
                             <span className="text-[11px] font-bold text-slate-500 uppercase">Daily 8-Hour Goal</span>
                             <span className="text-lg font-black text-[#1A2B3C]">{data.today.hoursWorked.toFixed(2)} / 8.00 <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">hrs</span></span>
@@ -394,16 +453,15 @@ function EmployeeDashboard({ data }) {
                             />
                         </div>
 
-                        {/* Overtime & Extra Hours Details */}
                         {overtimeHours > 0 && (
                             <div className="mt-4 flex gap-3">
                                 {overtimeHours >= 2 && (
-                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded border uppercase tracking-wider ${overtimeHours >= 2 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded border uppercase tracking-wider bg-amber-50 text-amber-700 border-amber-200">
                                         +2 Hours OT
                                     </span>
                                 )}
                                 {overtimeHours >= 4 && (
-                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded border uppercase tracking-wider ${overtimeHours >= 4 ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded border uppercase tracking-wider bg-rose-50 text-rose-700 border-rose-200">
                                         +4 Hours OT
                                     </span>
                                 )}
@@ -411,7 +469,7 @@ function EmployeeDashboard({ data }) {
                         )}
                     </div>
 
-                    {/* 6. DAILY STATUS SUMMARY */}
+                    {/* 3. DAILY STATUS SUMMARY */}
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-inner">
                         <div className="grid grid-cols-4 divide-x divide-slate-200">
                             <div className="px-4 text-center first:pl-0 last:pr-0">
@@ -438,9 +496,9 @@ function EmployeeDashboard({ data }) {
     );
 }
 
-// ----------------------------------------------------------------------
-// SUB-COMPONENTS: MANAGER & HR DASHBOARD
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────
+// MANAGER & HR DASHBOARD
+// ──────────────────────────────────────────────────────────────────────
 
 function ManagerDashboard({ team }) {
     return (
@@ -489,7 +547,7 @@ function ManagerDashboard({ team }) {
                     </div>
                 </div>
 
-                {/* 2 & 3. TEAM HOURS TRACKING & EMPLOYEE STATUS LIST */}
+                {/* 2. TEAM HOURS TRACKING */}
                 <div className="lg:col-span-3 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
                     <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-6">
                         <Clock className="w-4 h-4 text-[#2563EB]" />
@@ -560,18 +618,24 @@ function ManagerDashboard({ team }) {
     );
 }
 
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────
 // HELPERS
-// ----------------------------------------------------------------------
+// ──────────────────────────────────────────────────────────────────────
 
-function KPICard({ label, value, icon: IconComponent, color = "text-[#1A2B3C]" }) {
+function KPICard({ label, value, icon: IconComponent, color = "text-[#1A2B3C]", highlight }) {
+    const bgMap = {
+        emerald: 'bg-emerald-50 border-emerald-100',
+        amber: 'bg-amber-50 border-amber-100',
+        rose: 'bg-rose-50 border-rose-100',
+    };
+    const bgClass = highlight ? bgMap[highlight] : 'bg-white border-slate-200';
     return (
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className={`${bgClass} border rounded-xl p-4 shadow-sm`}>
             <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
                 <IconComponent className="w-4 h-4 text-slate-300" />
             </div>
-            <span className={`text-2xl font-black tracking-tight ${color}`}>{value}</span>
+            <span className={`text-2xl font-black tracking-tight ${color}`}>{value ?? 0}</span>
         </div>
     );
 }
@@ -580,7 +644,7 @@ function MetricRow({ label, value, highlight }) {
     return (
         <div className="flex justify-between items-center py-1.5">
             <span className="text-sm font-medium text-slate-600">{label}</span>
-            <span className={`text-sm font-bold ${highlight || 'text-[#1A2B3C]'}`}>{value}</span>
+            <span className={`text-sm font-bold ${highlight || 'text-[#1A2B3C]'}`}>{value ?? 0}</span>
         </div>
     );
 }
@@ -591,5 +655,41 @@ function QuickActionLink({ to, icon: IconComponent, label }) {
             <IconComponent className="w-4 h-4 text-slate-400 group-hover:text-white" />
             <span className="text-sm font-medium text-slate-200 group-hover:text-white">{label}</span>
         </Link>
+    );
+}
+
+// Audit log action type → icon
+function AuditIcon({ type }) {
+    const config = {
+        leave_request: { color: 'text-amber-500 bg-amber-50 border-amber-100', Icon: CalendarDays },
+        leave_approved: { color: 'text-emerald-500 bg-emerald-50 border-emerald-100', Icon: CheckCircle2 },
+        leave_rejected: { color: 'text-rose-500 bg-rose-50 border-rose-100', Icon: XCircle },
+        employee_added: { color: 'text-blue-500 bg-blue-50 border-blue-100', Icon: UserPlus },
+        salary_paid: { color: 'text-violet-500 bg-violet-50 border-violet-100', Icon: Building2 },
+        profile_updated: { color: 'text-slate-500 bg-slate-50 border-slate-200', Icon: Settings },
+    };
+    const { color, Icon } = config[type] || { color: 'text-slate-400 bg-slate-50 border-slate-200', Icon: Activity };
+    return (
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${color}`}>
+            <Icon className="w-4 h-4" />
+        </div>
+    );
+}
+
+// Audit log action type → badge
+function AuditBadge({ type }) {
+    const labels = {
+        leave_request: { text: 'Requested', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+        leave_approved: { text: 'Approved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        leave_rejected: { text: 'Rejected', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+        employee_added: { text: 'New Hire', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+        salary_paid: { text: 'Payroll', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+        profile_updated: { text: 'Updated', cls: 'bg-slate-50 text-slate-600 border-slate-200' },
+    };
+    const badge = labels[type] || { text: type, cls: 'bg-slate-50 text-slate-500 border-slate-200' };
+    return (
+        <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider shrink-0 ${badge.cls}`}>
+            {badge.text}
+        </span>
     );
 }

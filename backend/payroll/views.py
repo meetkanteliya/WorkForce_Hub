@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from .models import Salary
 from .serializers import SalarySerializer
 from accounts.permissions import IsAdmin, IsManagerOrAbove
+from dashboard.models import AuditLog
 
 
 class SalaryViewSet(ModelViewSet):
@@ -36,6 +37,26 @@ class SalaryViewSet(ModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAdmin()]
         return super().get_permissions()
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            action_type="salary_paid",
+            actor=self.request.user,
+            target_user=instance.employee.user,
+            message=f"{self.request.user.username} processed salary for {instance.employee.user.username}",
+            metadata={"salary_id": instance.id, "net_salary": str(instance.net_salary)},
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            action_type="salary_paid",
+            actor=self.request.user,
+            target_user=instance.employee.user,
+            message=f"{self.request.user.username} updated salary record for {instance.employee.user.username}",
+            metadata={"salary_id": instance.id, "net_salary": str(instance.net_salary)},
+        )
 
     @action(detail=False, methods=["get"], url_path="my")
     def my(self, request):
