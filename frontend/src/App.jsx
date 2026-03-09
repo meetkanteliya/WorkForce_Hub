@@ -66,7 +66,7 @@ export default function App() {
             <Route path="payroll" element={<ProtectedRoute roles={['admin', 'hr', 'manager']}><SalaryList /></ProtectedRoute>} />
             <Route path="payroll/new" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
             <Route path="payroll/:id/edit" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
-            <Route path="my-salary" element={<MySalary />} />
+            <Route path="my-salary" element={<ProtectedRoute roles={['employee', 'hr', 'manager']}><MySalary /></ProtectedRoute>} />
 
             {/* Dashboard Drill-down Pages (Admin & HR) */}
             <Route path="dashboard/employees" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardEmployees /></ProtectedRoute>} />

@@ -12,6 +12,7 @@ from .serializers import (
     LeaveBalanceWriteSerializer,
 )
 from accounts.permissions import IsAdmin, IsAdminOrHR, IsManagerOrAbove
+from accounts.models import User
 from dashboard.models import AuditLog, Notification
 from datetime import datetime
 
@@ -74,7 +75,6 @@ class LeaveRequestViewSet(ModelViewSet):
 
         instance = serializer.save(employee=employee)
 
-        # Audit log
         AuditLog.objects.create(
             action_type="leave_request",
             actor=self.request.user,
@@ -82,6 +82,29 @@ class LeaveRequestViewSet(ModelViewSet):
             message=f"{employee.user.username} requested {leave_type.name} leave ({start_date} to {end_date})",
             metadata={"leave_request_id": instance.id, "days": days_requested},
         )
+
+        # Send notifications to Admin, HR, and their Manager
+        users_to_notify = list(User.objects.filter(role__in=["admin", "hr"], is_active=True))
+        
+        # Add the manager of this employee's department if exists
+        if employee.department:
+            managers = User.objects.filter(
+                role="manager",
+                employee__department=employee.department,
+                is_active=True
+            )
+            for manager in managers:
+                if manager not in users_to_notify:
+                    users_to_notify.append(manager)
+
+        # Generate Notifications
+        notification_message = f"New leave request from {employee.user.username} for {leave_type.name} ({start_date} to {end_date})."
+        for notify_user in users_to_notify:
+            Notification.objects.create(
+                user=notify_user,
+                message=notification_message,
+                link="/leaves?tab=all"
+            )
 
     @action(detail=True, methods=["patch"], permission_classes=[IsManagerOrAbove])
     def approve(self, request, pk=None):

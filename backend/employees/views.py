@@ -7,7 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import Employee, Department
 from .serializers import EmployeeSerializer, DepartmentSerializer
 from accounts.permissions import IsAdmin, IsAdminOrHR
-from dashboard.models import AuditLog
+from dashboard.models import AuditLog, Notification
 
 
 class DepartmentViewSet(ModelViewSet):
@@ -25,6 +25,17 @@ class EmployeeViewSet(ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = self.queryset.all()
+
+        search_query = self.request.query_params.get('search', None)
+        if search_query:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(user__username__icontains=search_query) |
+                Q(department__name__icontains=search_query) |
+                Q(employee_code__icontains=search_query) |
+                Q(designation__icontains=search_query) |
+                Q(user__email__icontains=search_query)
+            ).distinct()
 
         if user.role in ["admin", "hr"]:
             return qs
@@ -49,6 +60,13 @@ class EmployeeViewSet(ModelViewSet):
             target_user=instance.user,
             message=f"{self.request.user.username} added new employee {instance.user.username}",
             metadata={"employee_id": instance.id},
+        )
+
+        # Welcome Notification for new employee
+        Notification.objects.create(
+            user=instance.user,
+            message="Welcome to WorkForce Hub! Please complete your profile.",
+            link="/profile",
         )
 
     def perform_update(self, serializer):

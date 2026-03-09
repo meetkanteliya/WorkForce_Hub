@@ -14,9 +14,12 @@ export default function MySalary() {
     const fetchSalaries = async () => {
         try {
             const res = await API.get('/payroll/my/');
-            setSalaries(res.data);
+            // Handle both paginated and unpaginated responses
+            const data = res.data.results !== undefined ? res.data.results : res.data;
+            setSalaries(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch salary data:', error);
+            setSalaries([]);
         } finally {
             setLoading(false);
         }
@@ -75,7 +78,7 @@ export default function MySalary() {
                             <div className="text-center pb-4 border-b border-gray-50">
                                 <p className="text-sm text-gray-500 font-medium mb-1">Net Salary</p>
                                 <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
-                                    ${parseFloat(salary.net_salary).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    ₹{parseFloat(salary.net_salary).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </p>
                             </div>
 
@@ -84,19 +87,19 @@ export default function MySalary() {
                                     <span className="text-gray-500 flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div> Basic
                                     </span>
-                                    <span className="font-semibold text-gray-700">${parseFloat(salary.basic_salary).toLocaleString()}</span>
+                                    <span className="font-semibold text-gray-700">₹{parseFloat(salary.basic_salary).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-500 flex items-center gap-2">
                                         <HiOutlineTrendingUp className="w-3.5 h-3.5 text-green-500" /> Bonus
                                     </span>
-                                    <span className="font-semibold text-green-600">+${parseFloat(salary.bonus).toLocaleString()}</span>
+                                    <span className="font-semibold text-green-600">+₹{parseFloat(salary.bonus).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-500 flex items-center gap-2">
                                         <HiOutlineTrendingDown className="w-3.5 h-3.5 text-red-500" /> Deductions
                                     </span>
-                                    <span className="font-semibold text-red-500">-${parseFloat(salary.deductions).toLocaleString()}</span>
+                                    <span className="font-semibold text-red-500">-₹{parseFloat(salary.deductions).toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>

@@ -29,6 +29,7 @@ export default function Profile() {
 
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
+    const [showPreview, setShowPreview] = useState(false);
 
     const fetchProfileData = async () => {
         try {
@@ -70,11 +71,15 @@ export default function Profile() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!window.confirm("Are you sure you want to save these profile changes?")) {
+            return;
+        }
+
         setSaving(true);
         try {
             const payload = {
                 ...formData,
-                email: formData.user?.email,
             };
 
             if (typeof payload.department === 'object' && payload.department !== null) {
@@ -295,43 +300,6 @@ export default function Profile() {
                     </div>
                 </div>
 
-                {/* My Salary Summary Strip */}
-                <div className="bg-[#0F172A]/50 rounded-xl p-5 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-[#2563EB]/20 flex items-center justify-center shrink-0">
-                            <Wallet className="w-5 h-5 text-[#60A5FA]" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">My Salary Summary</p>
-                            {salarySummary ? (
-                                <p className="text-sm font-medium text-slate-300">
-                                    Latest payslip: <span className="text-white font-semibold">{salarySummary.month} {salarySummary.year}</span>
-                                </p>
-                            ) : (
-                                <p className="text-sm text-slate-400">No recent salary data available.</p>
-                            )}
-                        </div>
-                    </div>
-                    {salarySummary && (
-                        <div className="flex items-center gap-6">
-                            <div className="text-right flex items-center gap-4">
-                                <div>
-                                    <p className="text-xs font-medium text-slate-400">Net Pay</p>
-                                    <p className="text-2xl font-black text-emerald-400 tracking-tight leading-none mt-1">
-                                        ₹{Number(salarySummary.net_salary).toLocaleString()}
-                                    </p>
-                                </div>
-                                <div className="h-10 w-px bg-white/10 hidden sm:block"></div>
-                            </div>
-                            <Link
-                                to="/my-salary"
-                                className="px-5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-bold text-white transition-colors border border-white/10 shadow-sm"
-                            >
-                                View All
-                            </Link>
-                        </div>
-                    )}
-                </div>
             </div>
 
             {employee ? (
@@ -513,7 +481,17 @@ function InfoField({ icon: Icon, label, name, value, type = "text", onChange, is
                         type={type}
                         name={name}
                         value={value}
-                        onChange={onChange}
+                        onChange={(e) => {
+                            if (name === 'phone' || name === 'emergency_contact_phone') {
+                                const val = e.target.value;
+                                if (val && !/^[0-9+() -]*$/.test(val)) return;
+
+                                // Restrict to max 10 digits
+                                const digitsOnly = val.replace(/[^0-9]/g, '');
+                                if (digitsOnly.length > 10) return;
+                            }
+                            onChange(e);
+                        }}
                         className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none transition-all text-sm font-bold text-[#1A2B3C] shadow-sm placeholder:font-medium placeholder:text-slate-400"
                     />
                 ) : (

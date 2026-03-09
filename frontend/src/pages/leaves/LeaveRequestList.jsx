@@ -136,9 +136,11 @@ export default function LeaveRequestList() {
                     <TabButton active={tab === 'all'} onClick={() => { setTab('all'); setStatusFilter('all'); }}>
                         {hasRole('admin', 'hr', 'manager') ? 'All Requests' : 'All'}
                     </TabButton>
-                    <TabButton active={tab === 'my'} onClick={() => { setTab('my'); setStatusFilter('all'); }}>
-                        My Leaves
-                    </TabButton>
+                    {!hasRole('admin') && (
+                        <TabButton active={tab === 'my'} onClick={() => { setTab('my'); setStatusFilter('all'); }}>
+                            My Leaves
+                        </TabButton>
+                    )}
                     {hasRole('admin', 'hr') && (
                         <TabButton active={tab === 'balances'} onClick={() => setTab('balances')}>
                             <Scale className="w-3.5 h-3.5 mr-1.5 inline-block" />

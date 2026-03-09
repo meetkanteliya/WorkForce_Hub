@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from .models import Salary
 from .serializers import SalarySerializer
 from accounts.permissions import IsAdmin, IsManagerOrAbove
-from dashboard.models import AuditLog
+from dashboard.models import AuditLog, Notification
 
 
 class SalaryViewSet(ModelViewSet):
@@ -46,6 +46,13 @@ class SalaryViewSet(ModelViewSet):
             target_user=instance.employee.user,
             message=f"{self.request.user.username} processed salary for {instance.employee.user.username}",
             metadata={"salary_id": instance.id, "net_salary": str(instance.net_salary)},
+        )
+
+        # Notify the employee about the salary creation
+        Notification.objects.create(
+            user=instance.employee.user,
+            message=f"Your salary slip for the recent period has been generated.",
+            link="/my-salary",
         )
 
     def perform_update(self, serializer):

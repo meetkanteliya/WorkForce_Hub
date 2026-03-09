@@ -280,7 +280,17 @@ function InputField({ icon: Icon, label, name, type = "text", value, onChange, r
                     type={type}
                     name={name}
                     value={value || ''}
-                    onChange={onChange}
+                    onChange={(e) => {
+                        if (name === 'phone' || name === 'emergency_contact_phone') {
+                            const val = e.target.value;
+                            if (val && !/^[0-9+() -]*$/.test(val)) return;
+                            
+                            // Restrict to max 10 digits
+                            const digitsOnly = val.replace(/[^0-9]/g, '');
+                            if (digitsOnly.length > 10) return;
+                        }
+                        onChange(e);
+                    }}
                     required={required}
                     placeholder={placeholder}
                     className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none transition-all text-sm font-semibold text-slate-700 shadow-sm"

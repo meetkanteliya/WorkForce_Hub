@@ -24,7 +24,7 @@ const navItems = [
     { to: '/departments', label: 'Departments', icon: Building2, roles: null },
     { to: '/leaves', label: 'Leaves', icon: CalendarClock, roles: null },
     { to: '/payroll', label: 'Payroll', icon: WalletCards, roles: ['admin', 'hr', 'manager'] },
-    { to: '/my-salary', label: 'My Salary', icon: WalletCards, roles: null },
+    { to: '/my-salary', label: 'My Salary', icon: WalletCards, roles: ['employee', 'manager', 'hr'] },
     { to: '/profile', label: 'Profile', icon: UserCircle2, roles: null },
     { to: '/change-password', label: 'Change Password', icon: KeyRound, roles: null },
 ];
@@ -42,6 +42,10 @@ export default function Layout() {
     const notifRef = useRef(null);
 
     const handleLogout = () => {
+        if (!window.confirm("Are you sure you want to log out?")) {
+            return;
+        }
+
         logout();
         navigate('/login');
     };
