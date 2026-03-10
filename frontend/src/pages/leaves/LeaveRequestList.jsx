@@ -13,6 +13,24 @@ const statusStyles = {
     rejected: 'bg-rose-100/80 text-rose-700 border border-rose-200/50',
 };
 
+const DEFAULT_LEAVE_ALLOCATIONS = {
+    'sick leave': 12,
+    'casual leave': 10,
+    'earned leave': 15,
+    'work from home': 20,
+};
+
+function normalizeLeaveTypeName(name) {
+    return (name || '').trim().toLowerCase().split(/\s+/).join(' ');
+}
+
+function getBaseAllocation(leaveType) {
+    const normalized = normalizeLeaveTypeName(leaveType?.name);
+    if (DEFAULT_LEAVE_ALLOCATIONS[normalized] != null) return DEFAULT_LEAVE_ALLOCATIONS[normalized];
+    const fallback = Number(leaveType?.max_days_per_year);
+    return Number.isFinite(fallback) ? fallback : 0;
+}
+
 export default function LeaveRequestList() {
     const { hasRole } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -93,21 +111,30 @@ export default function LeaveRequestList() {
         }
     };
 
-    const handleAdjust = async (id) => {
+    const handleAdjust = async (balance) => {
         try {
+            const allocatedNext = Number(editForm.allocated_days);
+            const base = getBaseAllocation(balance?.leave_type);
+            const maxAllowed = base + 3;
+
+            if (Number.isFinite(allocatedNext) && allocatedNext > maxAllowed) {
+                alert("Maximum extra leave limit exceeded. Only +3 additional leaves allowed.");
+                return;
+            }
+
             const payload = {
-                allocated_days: Number(editForm.allocated_days),
+                allocated_days: allocatedNext,
                 used_days: Number(editForm.used_days)
             };
-            const res = await API.patch(`/leaves/balances/${id}/adjust/`, payload);
+            const res = await API.patch(`/leaves/balances/${balance.id}/adjust/`, payload);
             setBalances((prev) =>
-                prev.map((b) => (b.id === id ? res.data : b))
+                prev.map((b) => (b.id === balance.id ? res.data : b))
             );
             
             // If the modal is open, we need to update the selectedEmployeeBalances state directly so it re-renders
             if (selectedEmployeeBalances) {
                  setSelectedEmployeeBalances(prev => 
-                      prev.map(b => b.id === id ? res.data : b)
+                      prev.map(b => b.id === balance.id ? res.data : b)
                  );
             }
             
@@ -587,7 +614,7 @@ export default function LeaveRequestList() {
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                <button onClick={() => handleAdjust(b.id)}
+                                                                <button onClick={() => handleAdjust(b)}
                                                                     className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg border border-emerald-200/50 transition-colors"
                                                                     title="Save"><Save className="w-4 h-4" /></button>
                                                                 <button onClick={() => setEditingId(null)}

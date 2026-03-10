@@ -2,6 +2,31 @@ from rest_framework import serializers
 from .models import LeaveType, LeaveRequest, LeaveBalance
 
 
+DEFAULT_LEAVE_ALLOCATIONS = {
+    "sick leave": 12,
+    "casual leave": 10,
+    "earned leave": 15,
+    "work from home": 20,
+}
+
+
+def _normalize_leave_type_name(name: str) -> str:
+    return " ".join((name or "").strip().lower().split())
+
+
+def get_base_allocation_for_type(leave_type: LeaveType) -> float:
+    """
+    Base allocation used for extra-leave cap validation.
+
+    For known leave types, use the fixed defaults from product requirements.
+    Otherwise, fall back to the LeaveType.max_days_per_year configured in DB.
+    """
+    normalized = _normalize_leave_type_name(getattr(leave_type, "name", ""))
+    if normalized in DEFAULT_LEAVE_ALLOCATIONS:
+        return float(DEFAULT_LEAVE_ALLOCATIONS[normalized])
+    return float(getattr(leave_type, "max_days_per_year", 0) or 0)
+
+
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveType
@@ -41,6 +66,31 @@ class LeaveBalanceWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveBalance
         fields = ("id", "employee", "leave_type", "year", "allocated_days", "used_days")
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+
+        instance = getattr(self, "instance", None)
+        leave_type = attrs.get("leave_type") or (getattr(instance, "leave_type", None) if instance else None)
+
+        # Only validate allocated_days when it's being set/changed.
+        if "allocated_days" in attrs and leave_type is not None:
+            base_allocation = get_base_allocation_for_type(leave_type)
+            max_allowed = base_allocation + 3
+            allocated_days = float(attrs.get("allocated_days") or 0)
+
+            if allocated_days > max_allowed:
+                raise serializers.ValidationError(
+                    {"detail": "Maximum extra leave limit exceeded. Only +3 additional leaves allowed."}
+                )
+
+        # Basic sanity: used_days shouldn't exceed allocated_days when both are known.
+        used_days = attrs.get("used_days", getattr(instance, "used_days", None) if instance else None)
+        allocated_days = attrs.get("allocated_days", getattr(instance, "allocated_days", None) if instance else None)
+        if used_days is not None and allocated_days is not None and float(used_days) > float(allocated_days):
+            raise serializers.ValidationError({"detail": "Used days cannot exceed allocated days."})
+
+        return attrs
 
 
 class LeaveRequestSerializer(serializers.ModelSerializer):

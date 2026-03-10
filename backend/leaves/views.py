@@ -248,20 +248,72 @@ class LeaveBalanceViewSet(ModelViewSet):
     def adjust(self, request, pk=None):
         """Admin/HR adjust allocated_days or used_days for a balance record."""
         balance = self.get_object()
-        allocated = request.data.get("allocated_days")
-        used = request.data.get("used_days")
+        prev_allocated = float(balance.allocated_days)
+        prev_used = float(balance.used_days)
 
-        if allocated is not None:
-            balance.allocated_days = float(allocated)
-        if used is not None:
-            balance.used_days = float(used)
-        balance.save()
+        serializer = LeaveBalanceWriteSerializer(
+            balance,
+            data=request.data,
+            partial=True,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        balance.refresh_from_db()
 
         AuditLog.objects.create(
-            action_type="profile_updated",
+            action_type="leave_balance_adjusted",
             actor=request.user,
             target_user=balance.employee.user,
-            message=f"{request.user.username} adjusted {balance.leave_type.name} balance for {balance.employee.user.username}",
-            metadata={"balance_id": balance.id, "allocated": balance.allocated_days, "used": balance.used_days},
+            message=f"{request.user.username} adjusted {balance.leave_type.name} leave balance for {balance.employee.user.username}",
+            metadata={
+                "balance_id": balance.id,
+                "employee_id": balance.employee_id,
+                "leave_type_id": balance.leave_type_id,
+                "year": balance.year,
+                "previous": {"allocated_days": prev_allocated, "used_days": prev_used},
+                "updated": {"allocated_days": float(balance.allocated_days), "used_days": float(balance.used_days)},
+            },
         )
+
         return Response(LeaveBalanceSerializer(balance).data)
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        AuditLog.objects.create(
+            action_type="leave_balance_adjusted",
+            actor=self.request.user,
+            target_user=instance.employee.user,
+            message=f"{self.request.user.username} created {instance.leave_type.name} leave balance for {instance.employee.user.username}",
+            metadata={
+                "balance_id": instance.id,
+                "employee_id": instance.employee_id,
+                "leave_type_id": instance.leave_type_id,
+                "year": instance.year,
+                "previous": None,
+                "updated": {"allocated_days": float(instance.allocated_days), "used_days": float(instance.used_days)},
+            },
+        )
+
+    def perform_update(self, serializer):
+        balance = self.get_object()
+        prev_allocated = float(balance.allocated_days)
+        prev_used = float(balance.used_days)
+
+        instance = serializer.save()
+
+        AuditLog.objects.create(
+            action_type="leave_balance_adjusted",
+            actor=self.request.user,
+            target_user=instance.employee.user,
+            message=f"{self.request.user.username} updated {instance.leave_type.name} leave balance for {instance.employee.user.username}",
+            metadata={
+                "balance_id": instance.id,
+                "employee_id": instance.employee_id,
+                "leave_type_id": instance.leave_type_id,
+                "year": instance.year,
+                "previous": {"allocated_days": prev_allocated, "used_days": prev_used},
+                "updated": {"allocated_days": float(instance.allocated_days), "used_days": float(instance.used_days)},
+            },
+        )

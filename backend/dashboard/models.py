@@ -10,6 +10,7 @@ class AuditLog(models.Model):
         ("leave_request", "Leave Requested"),
         ("leave_approved", "Leave Approved"),
         ("leave_rejected", "Leave Rejected"),
+        ("leave_balance_adjusted", "Leave Balance Adjusted"),
         ("employee_added", "Employee Added"),
         ("salary_paid", "Salary Paid"),
         ("profile_updated", "Profile Updated"),
