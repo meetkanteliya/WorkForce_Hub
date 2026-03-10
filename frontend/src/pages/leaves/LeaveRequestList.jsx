@@ -4,7 +4,7 @@ import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import {
     Plus, CheckCircle, XCircle, Clock4, Search,
-    Scale, ChevronDown, Pencil, Save, X, Users
+    Scale, ChevronDown, Pencil, Save, X, Eye
 } from 'lucide-react';
 
 const statusStyles = {
@@ -21,6 +21,8 @@ export default function LeaveRequestList() {
     const [tab, setTab] = useState(searchParams.get('tab') || 'all');
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
+    const [departmentFilter, setDepartmentFilter] = useState('All');
 
     // Balance management state
     const [balances, setBalances] = useState([]);
@@ -28,6 +30,17 @@ export default function LeaveRequestList() {
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ allocated_days: 0, used_days: 0 });
     const [balanceSearch, setBalanceSearch] = useState('');
+    
+    // ─── Modal State ───
+    const [selectedEmployeeBalances, setSelectedEmployeeBalances] = useState(null);
+
+    // ─── Pagination ───
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50); // user can change it if they want, default 50 to show generally "all" at a time without hard 10 limit
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [tab, statusFilter, searchQuery, dateFilter, balanceSearch, departmentFilter, itemsPerPage]);
 
     // ─── Fetch leave requests ───
     const fetchRequests = async (currentTab) => {
@@ -82,13 +95,26 @@ export default function LeaveRequestList() {
 
     const handleAdjust = async (id) => {
         try {
-            const res = await API.patch(`/leaves/balances/${id}/adjust/`, editForm);
+            const payload = {
+                allocated_days: Number(editForm.allocated_days),
+                used_days: Number(editForm.used_days)
+            };
+            const res = await API.patch(`/leaves/balances/${id}/adjust/`, payload);
             setBalances((prev) =>
                 prev.map((b) => (b.id === id ? res.data : b))
             );
+            
+            // If the modal is open, we need to update the selectedEmployeeBalances state directly so it re-renders
+            if (selectedEmployeeBalances) {
+                 setSelectedEmployeeBalances(prev => 
+                      prev.map(b => b.id === id ? res.data : b)
+                 );
+            }
+            
             setEditingId(null);
-        } catch {
-            alert('Failed to adjust balance');
+        } catch (err) {
+            console.error('Adjust balance error:', err.response?.data || err.message);
+            alert(err.response?.data?.detail || 'Failed to adjust balance');
         }
     };
 
@@ -103,21 +129,98 @@ export default function LeaveRequestList() {
         .filter(req =>
             (req.employee || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
             (req.leave_type_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        )
+        .filter(req => {
+            if (!dateFilter) return true;
+            // Assuming req.start_date and req.end_date are in YYYY-MM-DD format
+            const target = new Date(dateFilter).getTime();
+            const start = new Date(req.start_date).getTime();
+            const end = new Date(req.end_date).getTime();
+            return target >= start && target <= end;
+        })
+        .filter(req => {
+            if (departmentFilter === 'All') return true;
+            return (req.employee_department || 'Unassigned') === departmentFilter;
+        });
 
     // ─── Filtered balances ───
-    const filteredBalances = balances.filter(b =>
+    const searchFilteredBalances = balances.filter(b =>
         (b.employee_name || '').toLowerCase().includes(balanceSearch.toLowerCase()) ||
-        (b.leave_type?.name || '').toLowerCase().includes(balanceSearch.toLowerCase())
-    );
+        (b.department_name || '').toLowerCase().includes(balanceSearch.toLowerCase())
+    ).filter(b => {
+        if (departmentFilter === 'All') return true;
+        return (b.department_name || 'Unassigned') === departmentFilter;
+    });
+
+    // Group the balances by employee for the main table
+    const groupedBalances = {};
+    searchFilteredBalances.forEach(b => {
+        // employee_code can be empty/null, causing all such users to collapse into one row!
+        // We use employee_name (or employee id if available)
+        const key = b.employee_name || b.employee_code;
+        if (!groupedBalances[key]) {
+            groupedBalances[key] = {
+                employee_id: key,
+                employee_name: b.employee_name,
+                employee_code: b.employee_code,
+                employee_profile_picture: b.employee_profile_picture,
+                department_name: b.department_name,
+                total_allocated: 0,
+                total_used: 0,
+                total_remaining: 0,
+                records: []
+            };
+        }
+        // Prevent duplicate leave types for the same employee
+        const existingRecordIndex = groupedBalances[key].records.findIndex(
+            r => r.leave_type?.id === b.leave_type?.id
+        );
+
+        if (existingRecordIndex === -1) {
+            groupedBalances[key].total_allocated += parseFloat(b.allocated_days) || 0;
+            groupedBalances[key].total_used += parseFloat(b.used_days) || 0;
+            groupedBalances[key].total_remaining += parseFloat(b.remaining_days) || 0;
+            groupedBalances[key].records.push(b);
+        } else {
+            // Keep the latest record only (assuming higher ID means later or just take the new one)
+            if (b.id > groupedBalances[key].records[existingRecordIndex].id) {
+                // Subtract old
+                const oldRec = groupedBalances[key].records[existingRecordIndex];
+                groupedBalances[key].total_allocated -= parseFloat(oldRec.allocated_days) || 0;
+                groupedBalances[key].total_used -= parseFloat(oldRec.used_days) || 0;
+                groupedBalances[key].total_remaining -= parseFloat(oldRec.remaining_days) || 0;
+                
+                // Add new
+                groupedBalances[key].total_allocated += parseFloat(b.allocated_days) || 0;
+                groupedBalances[key].total_used += parseFloat(b.used_days) || 0;
+                groupedBalances[key].total_remaining += parseFloat(b.remaining_days) || 0;
+                
+                // Replace
+                groupedBalances[key].records[existingRecordIndex] = b;
+            }
+        }
+    });
+    
+    const aggregatedBalancesArray = Object.values(groupedBalances).sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+
+    // ─── Paginated lists ───
+    const totalRequests = filteredRequests.length;
+    const requestsTotalPages = Math.ceil(totalRequests / itemsPerPage) || 1;
+    const requestsStartIndex = (currentPage - 1) * itemsPerPage;
+    const currentRequests = filteredRequests.slice(requestsStartIndex, requestsStartIndex + itemsPerPage);
+
+    const totalBalances = aggregatedBalancesArray.length;
+    const balancesTotalPages = Math.ceil(totalBalances / itemsPerPage) || 1;
+    const balancesStartIndex = (currentPage - 1) * itemsPerPage;
+    const currentBalances = aggregatedBalancesArray.slice(balancesStartIndex, balancesStartIndex + itemsPerPage);
 
     return (
         <div className="animate-fade-in space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-[#1A2B3C] tracking-tight">Leave Management</h1>
-                    <p className="text-sm text-slate-500 mt-1">Review, approve, and track employee absence requests.</p>
+                    <h1 className="text-2xl font-bold text-[#1A2B3C] dark:text-white tracking-tight">Leave Management</h1>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Review, approve, and track employee absence requests.</p>
                 </div>
                 {!hasRole('admin') && (
                     <Link
@@ -131,8 +234,8 @@ export default function LeaveRequestList() {
             </div>
 
             {/* Tabs & Filters */}
-            <div className="glass-panel flex flex-col sm:flex-row gap-4 justify-between items-center p-4 rounded-xl">
-                <div className="flex gap-1.5 bg-slate-100/80 rounded-lg p-1 w-full sm:w-auto">
+            <div className="glass-panel dark:bg-[#111827]/40 flex flex-col sm:flex-row gap-4 justify-between items-center p-4 rounded-xl border-slate-200 dark:border-slate-800">
+                <div className="flex gap-1.5 bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-1 w-full sm:w-auto">
                     <TabButton active={tab === 'all'} onClick={() => { setTab('all'); setStatusFilter('all'); }}>
                         {hasRole('admin', 'hr', 'manager') ? 'All Requests' : 'All'}
                     </TabButton>
@@ -156,7 +259,7 @@ export default function LeaveRequestList() {
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                             >
                                 <option value="all">All Status</option>
                                 <option value="pending">Pending</option>
@@ -165,6 +268,43 @@ export default function LeaveRequestList() {
                             </select>
                             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
+                        {/* Department Filter */}
+                        <div className="relative">
+                            <select
+                                value={departmentFilter}
+                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                            >
+                                <option value="All">All Departments</option>
+                                <option value="IT">IT</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="HR / Human Resources">HR / Human Resources</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Operations">Operations</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                        {/* Date Filter (Admin/HR/Manager only) */}
+                        {hasRole('admin', 'hr', 'manager') && (
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={dateFilter}
+                                    onChange={(e) => setDateFilter(e.target.value)}
+                                    className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                                />
+                                {dateFilter && (
+                                    <button
+                                        onClick={() => setDateFilter('')}
+                                        className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"
+                                        title="Clear Date"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         {/* Search */}
                         <div className="relative flex-1 sm:w-56">
                             <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -173,20 +313,40 @@ export default function LeaveRequestList() {
                                 placeholder="Search..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 font-medium"
+                                className="block w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-[#1E293B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 dark:text-white font-medium"
                             />
                         </div>
                     </div>
                 ) : (
-                    <div className="relative flex-1 sm:w-64">
-                        <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                            type="text"
-                            placeholder="Search employee or type..."
-                            value={balanceSearch}
-                            onChange={(e) => setBalanceSearch(e.target.value)}
-                            className="block w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 font-medium"
-                        />
+                    <div className="flex gap-3 items-center w-full sm:w-auto">
+                        {/* Department Filter for Balances */}
+                        <div className="relative">
+                            <select
+                                value={departmentFilter}
+                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                            >
+                                <option value="All">All Departments</option>
+                                <option value="IT">IT</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="HR / Human Resources">HR / Human Resources</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Operations">Operations</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                        {/* Search for Balances */}
+                        <div className="relative flex-1 sm:w-64">
+                            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="Search employee or department..."
+                                value={balanceSearch}
+                                onChange={(e) => setBalanceSearch(e.target.value)}
+                                className="block w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-[#1E293B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 dark:text-white font-medium"
+                            />
+                        </div>
                     </div>
                 )}
             </div>
@@ -197,95 +357,67 @@ export default function LeaveRequestList() {
                     <div className="flex justify-center py-20">
                         <div className="w-10 h-10 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
                     </div>
-                ) : filteredBalances.length === 0 ? (
+                ) : aggregatedBalancesArray.length === 0 ? (
                     <EmptyState icon={Scale} title="No Balance Records" subtitle="No leave balance records found." />
                 ) : (
-                    <div className="glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="glass-panel dark:bg-[#111827]/40 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[900px] text-left border-collapse">
+                            <table className="w-full min-w-[700px] text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50/80 border-b border-slate-200">
+                                    <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
                                         <TH>Employee</TH>
                                         <TH>Department</TH>
-                                        <TH>Leave Type</TH>
-                                        <TH>Allocated</TH>
-                                        <TH>Used</TH>
+                                        <TH>Total Leaves</TH>
+                                        <TH>Used Leaves</TH>
                                         <TH>Remaining</TH>
-                                        <TH className="text-right">Actions</TH>
+                                        <TH className="text-right">Action</TH>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {filteredBalances.map((b) => (
-                                        <tr key={b.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 bg-white dark:bg-transparent">
+                                    {currentBalances.map((group) => (
+                                        <tr key={group.employee_id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     <img
-                                                        src={b.employee_profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(b.employee_name || 'U')}&size=64&background=1A2B3C&color=fff&bold=true&font-size=0.45`}
-                                                        alt={b.employee_name}
+                                                        src={group.employee_profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.employee_name || 'U')}&size=64&background=1A2B3C&color=fff&bold=true&font-size=0.45`}
+                                                        alt={group.employee_name}
                                                         className="w-8 h-8 rounded object-cover bg-[#1A2B3C] shrink-0"
                                                     />
                                                     <div>
-                                                        <span className="text-sm font-semibold text-slate-800">{b.employee_name}</span>
-                                                        <p className="text-[10px] text-slate-400 font-mono">{b.employee_code}</p>
+                                                        <span className="text-sm font-semibold text-slate-800 dark:text-white">{group.employee_name}</span>
+                                                        <p className="text-[10px] text-slate-400 font-mono">{group.employee_code}</p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{b.department_name}</td>
+                                            <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{group.department_name || '—'}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-800 dark:text-slate-200">{group.total_allocated}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-amber-600 dark:text-amber-400">{group.total_used}</td>
                                             <td className="px-6 py-4">
-                                                <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">
-                                                    {b.leave_type?.name}
+                                                <span className={`text-sm font-bold ${group.total_remaining <= 2 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                    {group.total_remaining}
                                                 </span>
                                             </td>
-
-                                            {editingId === b.id ? (
-                                                <>
-                                                    <td className="px-6 py-4">
-                                                        <input type="number" value={editForm.allocated_days}
-                                                            onChange={(e) => setEditForm({ ...editForm, allocated_days: e.target.value })}
-                                                            className="w-20 px-2 py-1.5 border border-[#2563EB] rounded-lg text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
-                                                        />
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <input type="number" value={editForm.used_days}
-                                                            onChange={(e) => setEditForm({ ...editForm, used_days: e.target.value })}
-                                                            className="w-20 px-2 py-1.5 border border-[#2563EB] rounded-lg text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
-                                                        />
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-bold text-emerald-600">
-                                                        {Math.max(0, editForm.allocated_days - editForm.used_days)}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button onClick={() => handleAdjust(b.id)}
-                                                                className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg border border-emerald-200/50 transition-colors"
-                                                                title="Save"><Save className="w-4 h-4" /></button>
-                                                            <button onClick={() => setEditingId(null)}
-                                                                className="p-1.5 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200/50 transition-colors"
-                                                                title="Cancel"><X className="w-4 h-4" /></button>
-                                                        </div>
-                                                    </td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <td className="px-6 py-4 text-sm font-bold text-slate-800">{b.allocated_days}</td>
-                                                    <td className="px-6 py-4 text-sm font-bold text-amber-600">{b.used_days}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`text-sm font-bold ${b.remaining_days <= 2 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                            {b.remaining_days}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => startEdit(b)}
-                                                            className="p-1.5 text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200/50 transition-colors opacity-0 group-hover:opacity-100"
-                                                            title="Adjust Balance"><Pencil className="w-4 h-4" /></button>
-                                                    </td>
-                                                </>
-                                            )}
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={() => setSelectedEmployeeBalances(group.records)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200/50 transition-colors"
+                                                    title="View Details">
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                    View Details
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationFooter 
+                            totalItems={totalBalances} 
+                            currentPage={currentPage}
+                            itemsPerPage={itemsPerPage}
+                            setCurrentPage={setCurrentPage}
+                            totalPages={balancesTotalPages}
+                            startIndex={balancesStartIndex}
+                        />
                     </div>
                 )
             ) : (
@@ -297,11 +429,11 @@ export default function LeaveRequestList() {
                 ) : filteredRequests.length === 0 ? (
                     <EmptyState icon={Clock4} title="No Leave Requests" subtitle="No leave requests matching your current filters." />
                 ) : (
-                    <div className="glass-panel overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="glass-panel dark:bg-[#111827]/40 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[800px] text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50/80 border-b border-slate-200">
+                                    <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700/50">
                                         <TH>Employee</TH>
                                         <TH>Leave Type</TH>
                                         <TH>Duration</TH>
@@ -312,9 +444,9 @@ export default function LeaveRequestList() {
                                         )}
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                    {filteredRequests.map((req) => (
-                                        <tr key={req.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 bg-white dark:bg-transparent">
+                                    {currentRequests.map((req) => (
+                                        <tr key={req.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     <img
@@ -322,22 +454,22 @@ export default function LeaveRequestList() {
                                                         alt={req.employee}
                                                         className="w-8 h-8 rounded object-cover bg-[#1A2B3C] shrink-0"
                                                     />
-                                                    <span className="text-sm font-semibold text-slate-800">{req.employee}</span>
+                                                    <span className="text-sm font-semibold text-slate-800 dark:text-white">{req.employee}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold">
                                                     {req.leave_type_name || req.leave_type}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[13px] font-bold text-slate-700">{req.start_date}</span>
-                                                    <span className="text-[11px] font-medium text-slate-400 mt-0.5">to {req.end_date}</span>
+                                                    <span className="text-[13px] font-bold text-slate-700 dark:text-slate-300">{req.start_date}</span>
+                                                    <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-0.5">to {req.end_date}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <p className="text-[13px] text-slate-500 font-medium line-clamp-2 leading-snug max-w-[250px]">
+                                                <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium line-clamp-2 leading-snug max-w-[250px]">
                                                     {req.reason || 'No reason provided'}
                                                 </p>
                                             </td>
@@ -370,8 +502,124 @@ export default function LeaveRequestList() {
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationFooter 
+                            totalItems={totalRequests} 
+                            currentPage={currentPage}
+                            itemsPerPage={itemsPerPage}
+                            setCurrentPage={setCurrentPage}
+                            totalPages={requestsTotalPages}
+                            startIndex={requestsStartIndex}
+                        />
                     </div>
                 )
+            )}
+            
+            {/* ─── MODAL: Employee Leave Details ─── */}
+            {selectedEmployeeBalances && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-3xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                            <div className="flex items-center gap-3">
+                                <img
+                                    src={selectedEmployeeBalances[0]?.employee_profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEmployeeBalances[0]?.employee_name || 'U')}&size=64&background=1A2B3C&color=fff&bold=true&font-size=0.45`}
+                                    alt="Profile"
+                                    className="w-10 h-10 rounded-full object-cover shrink-0"
+                                />
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white leading-tight">
+                                        {selectedEmployeeBalances[0]?.employee_name}
+                                    </h3>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                        {selectedEmployeeBalances[0]?.department_name || 'No Dept'} • {selectedEmployeeBalances[0]?.employee_code}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedEmployeeBalances(null);
+                                    setEditingId(null);
+                                }}
+                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        
+                        {/* Modal Body */}
+                        <div className="overflow-y-auto p-6 flex-1">
+                            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                            <TH>Leave Type</TH>
+                                            <TH>Allocated</TH>
+                                            <TH>Used</TH>
+                                            <TH>Remaining</TH>
+                                            <TH className="text-right">Actions</TH>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 bg-white dark:bg-transparent">
+                                        {selectedEmployeeBalances.map((b) => (
+                                            <tr key={b.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold">
+                                                        {b.leave_type?.name}
+                                                    </span>
+                                                </td>
+
+                                                {editingId === b.id ? (
+                                                    <>
+                                                        <td className="px-6 py-4">
+                                                            <input type="number" value={editForm.allocated_days}
+                                                                onChange={(e) => setEditForm({ ...editForm, allocated_days: e.target.value })}
+                                                                className="w-20 px-2 py-1.5 border border-[#2563EB] dark:bg-[#1E293B] dark:text-white rounded-lg text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+                                                            />
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <input type="number" value={editForm.used_days}
+                                                                onChange={(e) => setEditForm({ ...editForm, used_days: e.target.value })}
+                                                                className="w-20 px-2 py-1.5 border border-[#2563EB] dark:bg-[#1E293B] dark:text-white rounded-lg text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+                                                            />
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm font-bold text-emerald-600">
+                                                            {Math.max(0, editForm.allocated_days - editForm.used_days)}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <button onClick={() => handleAdjust(b.id)}
+                                                                    className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg border border-emerald-200/50 transition-colors"
+                                                                    title="Save"><Save className="w-4 h-4" /></button>
+                                                                <button onClick={() => setEditingId(null)}
+                                                                    className="p-1.5 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-lg border border-slate-200/50 transition-colors"
+                                                                    title="Cancel"><X className="w-4 h-4" /></button>
+                                                            </div>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="px-6 py-4 text-sm font-bold text-slate-800 dark:text-slate-200">{b.allocated_days}</td>
+                                                        <td className="px-6 py-4 text-sm font-bold text-amber-600 dark:text-amber-400">{b.used_days}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`text-sm font-bold ${b.remaining_days <= 2 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                                {b.remaining_days}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button onClick={() => startEdit(b)}
+                                                                className="p-1.5 text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200/50 transition-colors opacity-0 group-hover:opacity-100"
+                                                                title="Adjust Balance"><Pencil className="w-4 h-4" /></button>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -384,8 +632,8 @@ function TabButton({ active, onClick, children }) {
         <button
             onClick={onClick}
             className={`flex-1 sm:flex-none px-5 py-2 rounded-md text-[13px] font-bold uppercase tracking-wider transition-all ${active
-                ? 'bg-white text-[#1A2B3C] shadow-sm ring-1 ring-slate-200/50'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-white dark:bg-[#1E293B] text-[#1A2B3C] dark:text-white shadow-sm ring-1 ring-slate-200/50 dark:ring-slate-700'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                 }`}
         >
             {children}
@@ -395,7 +643,7 @@ function TabButton({ active, onClick, children }) {
 
 function TH({ children, className = '' }) {
     return (
-        <th className={`px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap ${className}`}>
+        <th className={`px-6 py-4 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap ${className}`}>
             {children}
         </th>
     );
@@ -403,12 +651,52 @@ function TH({ children, className = '' }) {
 
 function EmptyState({ icon: Icon, title, subtitle }) {
     return (
-        <div className="glass-panel rounded-2xl p-12 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+        <div className="glass-panel dark:bg-[#111827]/40 rounded-2xl p-12 text-center flex flex-col items-center">
+            <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-700">
                 <Icon className="w-8 h-8 text-slate-400" />
             </div>
-            <h3 className="text-lg font-bold text-[#1A2B3C]">{title}</h3>
-            <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
+            <h3 className="text-lg font-bold text-[#1A2B3C] dark:text-white">{title}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>
+        </div>
+    );
+}
+
+function PaginationFooter({ totalItems, currentPage, itemsPerPage, setCurrentPage, totalPages, startIndex }) {
+    if (totalItems === 0) return null;
+    return (
+        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-white dark:bg-transparent border-t border-slate-200 dark:border-slate-800 rounded-b-xl">
+            <div className="text-sm text-slate-500 dark:text-slate-400 mb-4 sm:mb-0">
+                Showing <span className="font-semibold text-slate-900 dark:text-white">{startIndex + 1}</span>–<span className="font-semibold text-slate-900 dark:text-white">{Math.min(startIndex + itemsPerPage, totalItems)}</span> of <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === page 
+                                ? 'bg-[#10B981] text-white border border-[#10B981]' 
+                                : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                        }`}
+                    >
+                        {page}
+                    </button>
+                ))}
+                <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    Next
+                </button>
+            </div>
         </div>
     );
 }

@@ -36,6 +36,7 @@ class LeaveRequestViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # Include all employees without restriction.
         qs = self.queryset.all()
 
         if user.role in ["admin", "hr"]:
@@ -224,6 +225,7 @@ class LeaveBalanceViewSet(ModelViewSet):
         user = self.request.user
         current_year = datetime.now().year
 
+        # Include all employees without restriction.
         queryset = self.queryset.all().filter(year=current_year)
 
         if user.role in ["admin", "hr"]:

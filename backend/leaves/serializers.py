@@ -45,6 +45,7 @@ class LeaveBalanceWriteSerializer(serializers.ModelSerializer):
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee = serializers.StringRelatedField(read_only=True)
+    employee_department = serializers.CharField(source="employee.department.name", read_only=True, default="Unassigned")
     leave_type_name = serializers.CharField(source="leave_type.name", read_only=True)
     employee_profile_picture = serializers.ImageField(source="employee.profile_picture", read_only=True)
 
@@ -53,6 +54,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "employee",
+            "employee_department",
             "employee_profile_picture",
             "leave_type",
             "leave_type_name",

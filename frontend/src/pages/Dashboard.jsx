@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 import {
@@ -123,6 +123,9 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
         ? new Date(data.last_updated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : null;
 
+    const leaveStatusRef = useRef(null);
+    const navigate = useNavigate();
+
     return (
         <div className="max-w-7xl mx-auto animate-fade-in pb-12">
 
@@ -155,11 +158,17 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
 
             {/* 1. TOP KPI CARDS */}
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Core Metrics</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <KPICard icon={Users} label="Total Staff" value={data.total_employees} />
-                <KPICard icon={UserCheck} label="Working Today" value={data.present_today} color="text-emerald-600" highlight="emerald" />
-                <KPICard icon={CalendarX2} label="On Leave" value={data.employees_on_leave_today} color="text-amber-600" highlight="amber" />
-                <KPICard icon={AlertCircle} label="Pending Req" value={data.pending_requests_total} color="text-rose-600" highlight="rose" />
+                <KPICard 
+                    icon={UserCheck} 
+                    label="Working Today" 
+                    value={data.present_today} 
+                    color="text-emerald-600" 
+                    highlight="emerald" 
+                    clickable={true}
+                    onClick={() => navigate('/employees?status=Present')}
+                />
                 <KPICard icon={Building2} label="Departments" value={data.total_departments} />
             </div>
 
@@ -219,7 +228,10 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
                 <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     {/* Leave Status Counts */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                    <div 
+                        ref={leaveStatusRef} 
+                        className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm transition-all duration-500 ease-out"
+                    >
                         <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-5">
                             <CalendarDays className="w-4 h-4 text-slate-400" />
                             Leave Status
@@ -624,15 +636,20 @@ function ManagerDashboard({ team }) {
 // HELPERS
 // ──────────────────────────────────────────────────────────────────────
 
-function KPICard({ label, value, icon: IconComponent, color = "text-[#1A2B3C]", highlight }) {
+function KPICard({ label, value, icon: IconComponent, color = "text-[#1A2B3C]", highlight, clickable, onClick }) {
     const bgMap = {
         emerald: 'bg-emerald-50 border-emerald-100',
         amber: 'bg-amber-50 border-amber-100',
         rose: 'bg-rose-50 border-rose-100',
     };
     const bgClass = highlight ? bgMap[highlight] : 'bg-white border-slate-200';
+    const clickClass = clickable ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md transition-all duration-300' : '';
+    
     return (
-        <div className={`${bgClass} border rounded-xl p-4 shadow-sm`}>
+        <div 
+            onClick={onClick}
+            className={`${bgClass} ${clickClass} border rounded-xl p-4 shadow-sm`}
+        >
             <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
                 <IconComponent className="w-4 h-4 text-slate-300" />

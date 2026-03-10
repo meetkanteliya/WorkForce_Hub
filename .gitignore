@@ -33,6 +33,10 @@ media/
 node_modules/
 frontend/dist/
 frontend/eslint-output.txt
+frontend/.eslint_output.txt
+frontend/eslint_report.txt
+frontend/lint_out.txt
+frontend/lint_output*.txt
 frontend/vite_log.txt
 
 # OS

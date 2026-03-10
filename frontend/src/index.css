@@ -1,10 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@custom-variant dark (&:is(.dark *));
+
 /* ===== Custom Design System ===== */
 
 @layer base {
     * {
-        font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
     body {
@@ -14,6 +20,25 @@
         /* Slate 50 base setting */
         color: #334155;
         /* Slate 700 text */
+        transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+            color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 200ms;
+    }
+
+    .dark body {
+        background-color: #0F172A;
+        /* Slate 900 */
+        color: #e2e8f0;
+        /* Slate 200 */
     }
 
     /* Smooth scrollbar */
@@ -58,6 +83,18 @@
         border: 1px solid rgba(226, 232, 240, 0.8);
         /* Slate 200 */
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+            border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+            box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+            transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .dark .glass-panel {
+        background: rgba(30, 41, 59, 0.7);
+        /* Slate 800 */
+        border-color: rgba(51, 65, 85, 0.8);
+        /* Slate 700 */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     }
 
     /* Subtle hover lift for cards */
@@ -73,18 +110,181 @@
 
     /* Animations */
     .animate-fade-in {
-        animation: fadeIn 0.4s ease-out;
+        animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .animate-slide-up {
+        animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     @keyframes fadeIn {
         from {
             opacity: 0;
-            transform: translateY(8px);
+            transform: translateY(10px);
         }
 
         to {
             opacity: 1;
             transform: translateY(0);
         }
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* Global Hover Overrides - Light Mode */
+    .hover\:bg-slate-50:hover,
+    .hover\:bg-slate-100:hover,
+    .hover\:bg-gray-50:hover,
+    .hover\:bg-gray-100:hover,
+    .hover\:bg-slate-50\/50:hover {
+        background-color: rgba(0, 0, 0, 0.04) !important;
+        /* Soft transparent dark */
+        box-shadow: none !important;
+    }
+
+    /* --- Dark Mode Semantic Overrides --- */
+    /* Target specific dark backgrounds that switch to light in dark mode for active tabs */
+    .dark .bg-white.text-\[\#1A2B3C\] {
+        background-color: #334155 !important;
+        /* Brighter slate for active tabs */
+        color: #ffffff !important;
+    }
+    .dark .bg-white {
+        background-color: #1E293B !important;
+        /* slate-800 */
+        border-color: #334155 !important;
+    }
+
+    .dark .bg-slate-50,
+    .dark .bg-slate-100,
+    .dark .bg-gray-50,
+    .dark .bg-gray-100 {
+        background-color: #0F172A !important;
+        /* slate-900 */
+        border-color: #1E293B !important;
+    }
+
+    /* Ensure table headers (TH) and light background sections have enough contrast */
+    .dark .bg-slate-50\/80 {
+        background-color: #0F172A !important;
+        border-color: #1E293B !important;
+    }
+
+    .dark .bg-slate-100\/80 {
+        background-color: #1E293B !important;
+        border-color: #334155 !important;
+    }
+
+    .dark .border-slate-200,
+    .dark .border-slate-100,
+    .dark .border-gray-200,
+    .dark .border-gray-100 {
+        border-color: #1E293B !important;
+        /* Slightly darker */
+    }
+
+    /* Override hover backgrounds that cause bright flashes */
+    .dark .hover\:bg-slate-50:hover,
+    .dark .hover\:bg-slate-100:hover,
+    .dark .hover\:bg-gray-50:hover,
+    .dark .hover\:bg-gray-100:hover,
+    .dark .hover\:bg-slate-50\/50:hover {
+        background-color: rgba(255, 255, 255, 0.04) !important;
+        /* Soft professional glass fill */
+        box-shadow: none !important;
+    }
+
+    .dark input,
+    .dark select,
+    .dark textarea {
+        background-color: #1E293B !important;
+        color: #f1f5f9 !important;
+        border-color: #334155 !important;
+    }
+
+    /* --- Softer Accents for Eye-Care in Dark Mode --- */
+    /* Primary Blue */
+    .dark .text-\[\#2563EB\],
+    .dark .text-blue-600 {
+        color: #60A5FA !important;
+        /* Softer Blue */
+    }
+
+    .dark .bg-\[\#2563EB\],
+    .dark .bg-blue-600 {
+        background-color: #3B82F6 !important;
+    }
+
+    .dark .text-\[\#1A2B3C\] {
+        color: #e2e8f0 !important;
+        /* Make sure very dark nav text is light */
+    }
+
+    /* Emerald (Success) */
+    .dark .text-emerald-600,
+    .dark .text-emerald-500 {
+        color: #34D399 !important;
+        /* Softer Emerald */
+    }
+
+    .dark .bg-emerald-500 {
+        background-color: #10B981 !important;
+    }
+
+    /* Rose (Danger) */
+    .dark .text-rose-600,
+    .dark .text-rose-500 {
+        color: #F87171 !important;
+        /* Softer Rose */
+    }
+
+    .dark .bg-rose-500 {
+        background-color: #EF4444 !important;
+    }
+
+    /* Amber (Warning) */
+    .dark .text-amber-600,
+    .dark .text-amber-500 {
+        color: #FBBF24 !important;
+        /* Softer Amber */
+    }
+
+    .dark .bg-amber-500 {
+        background-color: #F59E0B !important;
+    }
+
+    /* Soften the very bright badge backgrounds */
+    .dark .bg-emerald-50,
+    .dark .bg-emerald-100 {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        border-color: rgba(16, 185, 129, 0.2) !important;
+    }
+
+    .dark .bg-rose-50,
+    .dark .bg-rose-100 {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+        border-color: rgba(239, 68, 68, 0.2) !important;
+    }
+
+    .dark .bg-amber-50,
+    .dark .bg-amber-100 {
+        background-color: rgba(245, 158, 11, 0.1) !important;
+        border-color: rgba(245, 158, 11, 0.2) !important;
+    }
+
+    .dark .bg-blue-50,
+    .dark .bg-blue-100 {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+        border-color: rgba(59, 130, 246, 0.2) !important;
     }
 }

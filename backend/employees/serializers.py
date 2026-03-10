@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import Employee, Department
+from leaves.models import LeaveRequest
 
 User = get_user_model()
 
@@ -14,7 +16,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class UserMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "username", "email", "role")
+        fields = ("id", "username", "email", "role", "is_active")
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -26,6 +28,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     role = serializers.CharField(write_only=True, required=False)
     department_name = serializers.CharField(source="department.name", read_only=True, default="Unassigned")
+    is_on_leave_today = serializers.SerializerMethodField()
 
     class Meta:
         model = Employee
@@ -48,7 +51,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "emergency_contact_name",
             "emergency_contact_phone",
             "profile_picture",
+            "is_on_leave_today",
         )
+
+    def get_is_on_leave_today(self, obj):
+        today = timezone.localtime().date()
+        return LeaveRequest.objects.filter(
+            employee=obj,
+            status="approved",
+            start_date__lte=today,
+            end_date__gte=today
+        ).exists()
 
     def create(self, validated_data):
         user_id = validated_data.pop("user_id", None)

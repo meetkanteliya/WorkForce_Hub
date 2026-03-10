@@ -18,6 +18,9 @@ import {
     BriefcaseBusiness,
     UserCircle,
     Camera,
+    Hash,
+    AtSign,
+    AlertCircle
 } from 'lucide-react';
 
 export default function Profile() {
@@ -26,6 +29,7 @@ export default function Profile() {
     const [salarySummary, setSalarySummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(false);
 
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
@@ -69,13 +73,13 @@ export default function Profile() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = async (e) => {
+    const handleSaveClick = (e) => {
         e.preventDefault();
+        setShowSaveModal(true);
+    };
 
-        if (!window.confirm("Are you sure you want to save these profile changes?")) {
-            return;
-        }
-
+    const confirmSave = async () => {
+        setShowSaveModal(false);
         setSaving(true);
         try {
             const payload = {
@@ -84,19 +88,24 @@ export default function Profile() {
 
             if (typeof payload.department === 'object' && payload.department !== null) {
                 payload.department_id = payload.department.id;
-                delete payload.department;
             }
+            delete payload.department;
             delete payload.user;
+            delete payload.profile_picture; // Prevents generic file validation error on URL strings
 
             await API.patch('/employees/me/update/', payload);
             await fetchProfileData();
             setIsEditing(false);
         } catch (err) {
             console.error("Failed to save profile", err);
-            alert("Failed to save profile: " + (err.response?.data?.detail || "Unknown error"));
+            alert("Failed to save profile: " + (err.response?.data?.detail || JSON.stringify(err.response?.data) || "Unknown error"));
         } finally {
             setSaving(false);
         }
+    };
+
+    const cancelSave = () => {
+        setShowSaveModal(false);
     };
 
     // ─── Crop state (must be before any conditional returns!) ───
@@ -175,22 +184,21 @@ export default function Profile() {
     return (
         <div className="max-w-5xl mx-auto animate-fade-in space-y-6">
             {/* Header / Self-Service Identity Card */}
-            <div className="glass-navy rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-[#1A2B3C]/10 border border-[#1A2B3C]/10">
-                {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-[#2563EB]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4" />
+            <div className="bg-[#0B1120] rounded-2xl overflow-hidden shadow-xl border border-slate-800/60 relative">
+                {/* Banner Background */}
+                <div className="h-32 bg-gradient-to-r from-emerald-900/30 via-[#0B1120] to-[#0B1120] border-b border-emerald-900/20" />
 
-                <div className="relative flex flex-col md:flex-row items-center md:items-start gap-8 border-b border-white/10 pb-8 mb-8">
-                    <div className="relative group">
+                <div className="px-8 pb-8 flex flex-col md:flex-row items-center md:items-start gap-6 relative">
+                    <div className="relative group -mt-12">
                         <img
                             src={avatarUrl}
                             alt={user?.username}
                             onClick={() => setShowPreview(true)}
-                            className="w-28 h-28 rounded-2xl shadow-xl border-2 border-white/10 object-cover shrink-0 bg-[#0F172A] cursor-pointer hover:brightness-110 transition"
+                            className="w-28 h-28 rounded-full shadow-2xl border-4 border-[#0B1120] object-cover shrink-0 bg-[#0F172A] cursor-pointer hover:brightness-110 transition"
                         />
                         {isEditing && (
-                            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                                <Edit2 className="w-5 h-5 text-white" />
+                            <label className="absolute inset-x-0 bottom-0 top-0 m-1 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                <Camera className="w-6 h-6 text-white" />
                                 <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                             </label>
                         )}
@@ -237,85 +245,75 @@ export default function Profile() {
                                 <input
                                     type="range" min={1} max={3} step={0.05} value={zoom}
                                     onChange={(e) => setZoom(Number(e.target.value))}
-                                    className="w-40 accent-[#2563EB]"
+                                    className="w-40 accent-emerald-500"
                                 />
                             </div>
                             <div className="flex gap-3 mt-5">
                                 <button
                                     onClick={() => setCropImage(null)}
-                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-white/10 hover:bg-white/20 border border-white/10 transition-colors"
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-slate-800 hover:bg-slate-700 transition-colors"
                                 >Cancel</button>
                                 <button
                                     onClick={handleCropSave}
                                     disabled={uploading}
-                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#2563EB] hover:bg-[#1D4ED8] shadow-lg shadow-[#2563EB]/30 transition-all disabled:opacity-50"
+                                    className="px-6 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all disabled:opacity-50"
                                 >{uploading ? 'Saving...' : 'Save'}</button>
                             </div>
                         </div>
                     )}
-                    <div className="text-center md:text-left flex-1 min-w-0 flex flex-col justify-center h-full pt-1">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-3xl font-black text-white tracking-tight leading-tight">{user?.username}</h1>
-                                <p className="text-[#93C5FD] font-semibold mt-1 text-lg flex items-center justify-center md:justify-start gap-2">
-                                    <BriefcaseBusiness className="w-4 h-4" />
-                                    {employee?.designation || 'No designation'}
-                                </p>
-                            </div>
-                            <div className="flex gap-3 justify-center md:justify-end">
-                                <button
-                                    onClick={handleEditToggle}
-                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-all shadow-sm border ${isEditing
-                                        ? 'bg-white text-[#1A2B3C] border-white'
-                                        : 'bg-[#1A2B3C] hover:bg-[#0F172A] text-white border-white/10'
-                                        }`}
-                                >
-                                    {isEditing ? (
-                                        <><X className="w-4 h-4" /> Cancel</>
-                                    ) : (
-                                        <><Edit2 className="w-4 h-4" /> Edit Profile</>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap justify-center md:justify-start gap-3 mt-5">
-                            <span className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                <ShieldCheck className="w-4 h-4" />
-                                Role: {user?.role || 'None'}
+                    <div className="flex-1 mt-2 text-center md:text-left">
+                        <h1 className="text-2xl font-bold text-slate-100 tracking-tight">{user?.username}</h1>
+                        <p className="text-slate-400 font-medium mt-1 text-sm">
+                            {employee?.designation || 'No designation'}
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-4">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#052E16] text-emerald-400 text-[11px] font-bold tracking-wide border border-emerald-900/50">
+                                <ShieldCheck className="w-3 h-3" />
+                                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'None'}
                             </span>
                             {employee?.employee_code && (
-                                <span className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold tracking-wider text-slate-200">
-                                    <BadgeCheck className="w-4 h-4 text-[#60A5FA]" />
-                                    ID: {employee.employee_code}
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/50 text-slate-300 text-[11px] font-bold tracking-wide border border-slate-700/50 uppercase">
+                                    <Hash className="w-3 h-3 text-slate-400" />
+                                    {employee.employee_code}
                                 </span>
                             )}
                             {employee?.department && (
-                                <span className="inline-flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold tracking-wider text-slate-200">
-                                    <Building2 className="w-4 h-4 text-amber-400" />
-                                    Dept: {employee?.department_name || 'Unassigned'}
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/50 text-slate-300 text-[11px] font-bold tracking-wide border border-slate-700/50">
+                                    <UserCircle className="w-3 h-3 text-slate-400" />
+                                    {employee?.department_name || 'Unassigned'}
                                 </span>
                             )}
                         </div>
                     </div>
+                    <div className="mt-4 md:mt-2">
+                        <button
+                            onClick={handleEditToggle}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm border ${isEditing
+                                ? 'bg-slate-700 text-white border-slate-600 hover:bg-slate-600'
+                                : 'bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border-emerald-500/20'
+                                }`}
+                        >
+                            {isEditing ? (
+                                <><X className="w-4 h-4" /> Cancel</>
+                            ) : (
+                                <><Edit2 className="w-4 h-4" /> Edit Profile</>
+                            )}
+                        </button>
+                    </div>
                 </div>
-
             </div>
 
             {employee ? (
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                <form onSubmit={handleSaveClick} className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
 
                     {/* User Credentials Panel */}
-                    <div className="glass-panel rounded-2xl p-6 md:col-span-2 relative overflow-hidden group hover-lift">
-                        <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <ShieldCheck className="w-24 h-24 text-slate-400" />
-                        </div>
-                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-6 relative z-10">
-                            <ShieldCheck className="w-4 h-4 text-[#2563EB]" />
+                    <div className="bg-[#0B1120] border border-slate-800/60 rounded-2xl p-6 relative">
+                        <h2 className="text-[13px] font-bold text-slate-200 flex items-center gap-2 mb-6 border-b border-slate-800 pb-4">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
                             System Access Credentials
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
-                            <InfoField icon={UserCircle} label="System Username" value={user?.username || '—'} isEditing={false} />
+                        <div className="space-y-5">
+                            <InfoField icon={AtSign} label="System Username" value={user?.username || '—'} isEditing={false} />
                             <InfoField
                                 icon={Mail}
                                 label="Registered Email"
@@ -328,8 +326,8 @@ export default function Profile() {
                                 icon={ShieldCheck}
                                 label="Access Level"
                                 value={
-                                    <span className="capitalize px-3 py-1 rounded-md text-xs font-bold bg-slate-100 text-[#1A2B3C] border border-slate-200 shadow-sm shadow-slate-200/50">
-                                        {user?.role || 'Unassigned'}
+                                    <span className="capitalize px-2.5 py-1 rounded text-xs font-bold bg-slate-800/50 text-slate-300 border border-slate-700/50">
+                                        {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'None'}
                                     </span>
                                 }
                                 isEditing={false}
@@ -338,15 +336,14 @@ export default function Profile() {
                     </div>
 
                     {/* Personal Information */}
-                    <div className="glass-panel rounded-2xl p-6 hover-lift relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-[100px] pointer-events-none" />
-                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-6">
-                            <Phone className="w-4 h-4 text-amber-500" />
+                    <div className="bg-[#0B1120] border border-slate-800/60 rounded-2xl p-6 relative">
+                        <h2 className="text-[13px] font-bold text-slate-200 flex items-center gap-2 mb-6 border-b border-slate-800 pb-4">
+                            <Phone className="w-4 h-4 text-blue-500" />
                             Contact Information
                         </h2>
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             <InfoField
-                                icon={Phone} label="Contact Phone" name="phone"
+                                icon={Phone} label="Phone Number" name="phone"
                                 value={isEditing ? formData.phone || '' : employee.phone || '—'}
                                 onChange={handleChange} isEditing={isEditing}
                             />
@@ -364,25 +361,24 @@ export default function Profile() {
                     </div>
 
                     {/* Work Information */}
-                    <div className="glass-panel rounded-2xl p-6 hover-lift relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-[100px] pointer-events-none" />
+                    <div className="bg-[#0B1120] border border-slate-800/60 rounded-2xl p-6 relative">
                         {!canEditWorkInfo && isEditing && (
-                            <div className="absolute top-0 right-0 bg-slate-100 text-slate-500 text-[10px] font-bold px-4 py-2 rounded-bl-xl border-b border-l border-slate-200 shadow-sm">
-                                LOCKED BY HR
+                            <div className="absolute top-0 right-0 bg-slate-800 text-slate-400 text-[10px] font-bold px-3 py-1 rounded-bl-xl border-b border-l border-slate-700 shadow-sm z-10">
+                                CUSTOM
                             </div>
                         )}
-                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-6">
-                            <BriefcaseBusiness className="w-4 h-4 text-emerald-500" />
+                        <h2 className="text-[13px] font-bold text-slate-200 flex items-center gap-2 mb-6 border-b border-slate-800 pb-4">
+                            <BriefcaseBusiness className="w-4 h-4 text-amber-500" />
                             Professional Details
                         </h2>
-                        <div className="space-y-6">
+                        <div className="space-y-5">
                             <InfoField
-                                icon={BadgeCheck} label="Employee ID" name="employee_code"
+                                icon={Hash} label="Employee ID" name="employee_code"
                                 value={isEditing ? formData.employee_code || '' : employee.employee_code || '—'}
                                 onChange={handleChange} isEditing={isEditing && canEditWorkInfo}
                             />
                             <InfoField
-                                icon={BriefcaseBusiness} label="Current Designation" name="designation"
+                                icon={BadgeCheck} label="Current Designation" name="designation"
                                 value={isEditing ? formData.designation || '' : employee.designation || '—'}
                                 onChange={handleChange} isEditing={isEditing && canEditWorkInfo}
                             />
@@ -402,20 +398,19 @@ export default function Profile() {
                     </div>
 
                     {/* Emergency Contact */}
-                    <div className="glass-panel rounded-2xl p-6 hover-lift md:col-span-2 relative overflow-hidden flex flex-col justify-center">
-                        <div className="absolute top-0 right-0 w-64 h-full bg-rose-500/5 transform skew-x-[-20deg] pointer-events-none translate-x-12" />
-                        <h2 className="text-xs font-bold text-[#1A2B3C] uppercase tracking-widest flex items-center gap-2 mb-6">
-                            <Phone className="w-4 h-4 text-rose-500" />
+                    <div className="bg-[#0B1120] border border-slate-800/60 rounded-2xl p-6 relative flex flex-col justify-start">
+                        <h2 className="text-[13px] font-bold text-slate-200 flex items-center gap-2 mb-6 border-b border-slate-800 pb-4">
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
                             Emergency Contact
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="space-y-5">
                             <InfoField
-                                icon={UserCircle} label="Contact Name" name="emergency_contact_name"
+                                icon={UserCircle} label="Emergency Contact Name" name="emergency_contact_name"
                                 value={isEditing ? formData.emergency_contact_name || '' : employee.emergency_contact_name || '—'}
                                 onChange={handleChange} isEditing={isEditing}
                             />
                             <InfoField
-                                icon={Phone} label="Contact Phone Number" name="emergency_contact_phone"
+                                icon={Phone} label="Emergency Phone Number" name="emergency_contact_phone"
                                 value={isEditing ? formData.emergency_contact_phone || '' : employee.emergency_contact_phone || '—'}
                                 onChange={handleChange} isEditing={isEditing}
                             />
@@ -464,18 +459,51 @@ export default function Profile() {
                     </div>
                 </div>
             )}
+
+            {/* Custom Save Modal */}
+            {showSaveModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
+                                <Check className="w-8 h-8 text-emerald-500" strokeWidth={2} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Save Changes</h3>
+                            <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
+                                Are you sure you want to apply these profile changes?
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 flex gap-3 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={cancelSave}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmSave}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-500 rounded-xl hover:bg-emerald-600 shadow-sm shadow-emerald-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                            >
+                                Yes, Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 function InfoField({ icon: Icon, label, name, value, type = "text", onChange, isEditing }) {
     return (
-        <div className="flex items-start gap-4 group">
-            <div className={`mt-0.5 w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-colors border ${isEditing ? 'bg-[#2563EB]/10 text-[#2563EB] border-[#2563EB]/20' : 'bg-slate-50 text-slate-400 group-hover:bg-[#2563EB]/10 group-hover:text-[#2563EB] border-slate-100 group-hover:border-[#2563EB]/20'}`}>
-                <Icon className="w-5 h-5" />
+        <div className="flex items-center gap-4">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-slate-800/40 border border-slate-700/50 text-slate-400">
+                <Icon className="w-4 h-4" />
             </div>
-            <div className="flex-1 min-w-0 pt-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>
+            <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-slate-500 mb-0.5">{label}</p>
                 {isEditing ? (
                     <input
                         type={type}
@@ -492,10 +520,10 @@ function InfoField({ icon: Icon, label, name, value, type = "text", onChange, is
                             }
                             onChange(e);
                         }}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] outline-none transition-all text-sm font-bold text-[#1A2B3C] shadow-sm placeholder:font-medium placeholder:text-slate-400"
+                        className="w-full px-3 py-1.5 bg-[#111827] border border-slate-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all text-[13px] font-semibold text-slate-200 placeholder:text-slate-600"
                     />
                 ) : (
-                    <div className="text-sm font-bold text-[#1A2B3C] truncate">{value}</div>
+                    <div className="text-[13px] font-bold text-slate-200 truncate">{value}</div>
                 )}
             </div>
         </div>

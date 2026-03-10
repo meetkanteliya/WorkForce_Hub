@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import API from '../api/axios';
 import {
     LayoutDashboard,
@@ -16,6 +17,8 @@ import {
     Bell,
     CheckCheck,
     Trash2,
+    Sun,
+    Moon,
 } from 'lucide-react';
 
 const navItems = [
@@ -31,6 +34,7 @@ const navItems = [
 
 export default function Layout() {
     const { user, logout, profilePic } = useAuth();
+    const { isDarkMode, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -41,13 +45,21 @@ export default function Layout() {
     const [notifOpen, setNotifOpen] = useState(false);
     const notifRef = useRef(null);
 
-    const handleLogout = () => {
-        if (!window.confirm("Are you sure you want to log out?")) {
-            return;
-        }
+    // Logout Modal state
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+    const handleLogoutClick = () => {
+        setShowLogoutModal(true);
+    };
+
+    const confirmLogout = () => {
+        setShowLogoutModal(false);
         logout();
         navigate('/login');
+    };
+
+    const cancelLogout = () => {
+        setShowLogoutModal(false);
     };
 
     // Fetch notifications
@@ -118,7 +130,7 @@ export default function Layout() {
     const currentPage = location.pathname.split('/')[1] || 'dashboard';
 
     return (
-        <div className="flex h-screen bg-slate-50 text-slate-800">
+        <div className={`flex h-screen ${isDarkMode ? 'bg-[#0F172A] text-slate-200' : 'bg-slate-50 text-slate-800'} transition-colors duration-300`}>
             {/* Mobile overlay */}
             {sidebarOpen && (
                 <div
@@ -189,7 +201,7 @@ export default function Layout() {
                         </div>
                     </div>
                     <button
-                        onClick={handleLogout}
+                        onClick={handleLogoutClick}
                         className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors font-medium"
                     >
                         <LogOut className="w-4 h-4" strokeWidth={1.5} />
@@ -201,7 +213,7 @@ export default function Layout() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
                 {/* Top bar */}
-                <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10 shrink-0">
+                <header className={`h-16 ${isDarkMode ? 'bg-[#1E293B]/80 border-slate-700' : 'bg-white/80 border-slate-200'} backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-10 shrink-0 transition-colors duration-300`}>
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setSidebarOpen(true)}
@@ -220,19 +232,6 @@ export default function Layout() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="hidden md:flex relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </div>
-                            <input
-                                type="text"
-                                className="block w-64 pl-9 pr-3 py-1.5 border border-slate-200 rounded-md leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#2563EB] focus:border-[#2563EB] sm:text-sm transition-colors"
-                                placeholder="Search..."
-                            />
-                        </div>
-
                         {/* Notification Bell */}
                         <div className="relative" ref={notifRef}>
                             <button
@@ -304,6 +303,18 @@ export default function Layout() {
                             )}
                         </div>
 
+                        {/* Theme Toggle */}
+                        <button
+                            onClick={toggleTheme}
+                            className={`relative p-2 rounded-lg transition-all duration-300 overflow-hidden ${isDarkMode ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                        >
+                            <div className="relative w-5 h-5">
+                                <Sun className={`absolute inset-0 w-5 h-5 transition-transform duration-500 ease-out ${isDarkMode ? '-rotate-90 opacity-0 scale-50' : 'rotate-0 opacity-100 scale-100'}`} />
+                                <Moon className={`absolute inset-0 w-5 h-5 transition-transform duration-500 ease-out ${isDarkMode ? 'rotate-0 opacity-100 scale-100' : 'rotate-90 opacity-0 scale-50'}`} />
+                            </div>
+                        </button>
+
                         <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-md">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             <span className="text-[11px] font-semibold text-emerald-700 tracking-wide">JWT SECURED</span>
@@ -312,12 +323,43 @@ export default function Layout() {
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                <main className={`flex-1 overflow-y-auto p-6 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-slate-50'} transition-colors duration-300`}>
                     <div className="animate-fade-in">
                         <Outlet />
                     </div>
                 </main>
             </div>
+
+            {/* Custom Logout Modal */}
+            {showLogoutModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-rose-50">
+                                <LogOut className="w-8 h-8 text-rose-500" strokeWidth={2} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Sign Out</h3>
+                            <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
+                                Are you sure you want to log out of your WorkForce Hub account?
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 flex gap-3 border-t border-slate-100">
+                            <button
+                                onClick={cancelLogout}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmLogout}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-sm shadow-rose-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/50"
+                            >
+                                Yes, Sign Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

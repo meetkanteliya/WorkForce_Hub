@@ -20,9 +20,14 @@ export default function DashboardEmployees() {
             const res = await API.get(`/dashboard/employees/?${params}`);
             setEmployees(res.data.results ?? res.data);
             setMeta({ count: res.data.count || 0, next: res.data.next, previous: res.data.previous });
-        } catch { } finally { setLoading(false); }
+        } catch (error) {
+            console.error('Failed to fetch employees:', error);
+        } finally { 
+            setLoading(false); 
+        }
     };
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { fetchEmployees(); }, [page, roleFilter]);
 
     const handleSearch = (e) => { e.preventDefault(); setPage(1); fetchEmployees(); };
