@@ -213,6 +213,12 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
         # Forward employee join/leave/profile updates to clients
         await self.send(text_data=json.dumps({"type": "employee", **event}))
 
+    async def company_message_deleted(self, event):
+        await self.send(text_data=json.dumps({"type": "deleted", **event}))
+
+    async def company_read_receipt(self, event):
+        await self.send(text_data=json.dumps({"type": "read", **event}))
+
     @database_sync_to_async
     def get_user_from_token(self, token):
         if not token:

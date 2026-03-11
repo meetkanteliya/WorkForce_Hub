@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { Send, MessageSquare, Clock, Paperclip, Users } from 'lucide-react';
+import { Send, MessageSquare, Clock, Paperclip, Users, Trash2, Search } from 'lucide-react';
 
 function getBackendOrigin() {
   // Frontend runs on Vite (5173) while Django runs on 8000 in dev.
@@ -23,11 +23,17 @@ export default function CompanyChat() {
   const [socket, setSocket] = useState(null);
   const [typingUsers, setTypingUsers] = useState(() => new Map());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState({ limit: 30, offset: 0, hasMore: true });
+  const [loadingMore, setLoadingMore] = useState(false);
   const messagesEndRef = useRef(null);
+  const scrollerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
+  const readMarkRef = useRef({ lastUpToId: null, timer: null });
 
   const meId = user?.id;
+  const isAdminHr = user?.role === 'admin' || user?.role === 'hr';
 
   const avatarFallback = useMemo(() => {
     const name = user?.username || 'User';
@@ -49,8 +55,18 @@ export default function CompanyChat() {
     const load = async () => {
       setLoadingHistory(true);
       try {
-        const res = await API.get('/chat/company/messages/');
-        setMessages(res.data.results ?? res.data);
+        const res = await API.get('/chat/company/messages/', {
+          params: { limit: page.limit, offset: 0, q: q || undefined },
+        });
+        const data = res.data?.results ?? res.data;
+        const results = Array.isArray(data) ? data : [];
+        // API returns newest-first for pagination; display oldest->newest
+        setMessages(results.slice().reverse());
+        setPage((p) => ({
+          ...p,
+          offset: results.length,
+          hasMore: Boolean(res.data?.next) || results.length === p.limit,
+        }));
       } finally {
         setLoadingHistory(false);
       }
@@ -116,6 +132,24 @@ export default function CompanyChat() {
           }
         }
       }
+
+      if (data.type === 'deleted' && data.payload) {
+        setMessages((prev) => prev.map((m) => (m.id === data.payload.id ? { ...m, ...data.payload } : m)));
+      }
+
+      if (data.type === 'read' && data.payload) {
+        // Fast-path: update read_by_count for messages I sent up to a certain id
+        const { user_id, up_to_id } = data.payload;
+        if (!user_id || !up_to_id) return;
+        if (user_id === meId) return;
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m?.sender?.id !== meId) return m;
+            if (!m?.id || m.id > up_to_id) return m;
+            return { ...m, read_by_count: Math.max(m.read_by_count || 0, 1) };
+          })
+        );
+      }
     };
 
     ws.onclose = () => setSocket(null);
@@ -124,7 +158,7 @@ export default function CompanyChat() {
     return () => {
       ws.close();
     };
-  }, [tokens?.access, meId]);
+  }, [tokens?.access, meId, q]);
 
   // Scroll + reset unread when focused
   useEffect(() => {
@@ -187,6 +221,65 @@ export default function CompanyChat() {
     }
   };
 
+  const fetchMore = async () => {
+    if (loadingMore || loadingHistory) return;
+    if (!page.hasMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await API.get('/chat/company/messages/', {
+        params: { limit: page.limit, offset: page.offset, q: q || undefined },
+      });
+      const results = res.data?.results ?? [];
+      // results are newest-first; we are prepending older messages at top:
+      const older = results.slice().reverse();
+      setMessages((prev) => [...older, ...prev]);
+      setPage((p) => ({
+        ...p,
+        offset: p.offset + results.length,
+        hasMore: Boolean(res.data?.next) || results.length === p.limit,
+      }));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const onScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    if (el.scrollTop < 80) fetchMore();
+  };
+
+  const debouncedMarkReadUpTo = (upToId) => {
+    if (!upToId) return;
+    if (readMarkRef.current.lastUpToId && upToId <= readMarkRef.current.lastUpToId) return;
+    readMarkRef.current.lastUpToId = upToId;
+    if (readMarkRef.current.timer) clearTimeout(readMarkRef.current.timer);
+    readMarkRef.current.timer = setTimeout(() => {
+      API.post('/chat/company/messages/mark-read/', { up_to_id: readMarkRef.current.lastUpToId }).catch(() => {});
+    }, 600);
+  };
+
+  // Mark read when messages change (simple heuristic: mark up to latest message id)
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (last?.id) debouncedMarkReadUpTo(last.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
+
+  const handleDelete = async (msg) => {
+    if (!msg?.id) return;
+    const senderId = msg?.sender?.id;
+    const canDelete = isAdminHr || senderId === meId;
+    if (!canDelete) return;
+    try {
+      await API.delete(`/chat/company/messages/${msg.id}/`);
+      // WS event will update all clients, but update locally immediately too.
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, is_deleted: true, content: '' } : m)));
+    } catch (err) {
+      console.error('Delete failed', err);
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-120px)] bg-slate-50 dark:bg-[#0B1120] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in">
       <div className="flex-1 flex flex-col min-w-0 bg-white/50 dark:bg-[#0B1120]/50">
@@ -205,13 +298,27 @@ export default function CompanyChat() {
               {typingText || 'Everyone in the company can see this room'}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
-            <Users className="w-4 h-4" />
-            {members?.length || 0}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0B1120]">
+              <Search className="w-4 h-4 text-slate-400" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search…"
+                className="w-44 bg-transparent outline-none text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+              <Users className="w-4 h-4" />
+              {members?.length || 0}
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div ref={scrollerRef} onScroll={onScroll} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {loadingMore && (
+            <div className="text-center text-xs text-slate-400">Loading older messages…</div>
+          )}
           {loadingHistory ? (
             <div className="flex justify-center items-center h-full">
               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -232,6 +339,8 @@ export default function CompanyChat() {
               const pic = sender.profile_picture
                 ? `${getBackendOrigin()}${sender.profile_picture}`
                 : `https://ui-avatars.com/api/?name=${encodeURIComponent(sender.full_name || 'User')}&background=1A2B3C&color=fff`;
+              const canDelete = isAdminHr || sender.id === meId;
+              const isDeleted = Boolean(msg.is_deleted);
 
               return (
                 <div key={msg.id || i} className={`flex gap-3 max-w-[85%] ${isMe ? 'ml-auto flex-row-reverse' : ''}`}>
@@ -259,7 +368,9 @@ export default function CompanyChat() {
                           : 'bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 shadow-sm rounded-tl-sm'
                       }`}
                     >
-                      {msg.content ? (
+                      {isDeleted ? (
+                        <span className="opacity-70 italic">This message was deleted</span>
+                      ) : msg.content ? (
                         msg.content
                       ) : msg.attachment_url ? (
                         <a
@@ -274,12 +385,29 @@ export default function CompanyChat() {
                         <span className="opacity-70">—</span>
                       )}
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {msg.timestamp
-                        ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ''}
-                    </span>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {msg.timestamp
+                          ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : ''}
+                      </span>
+                      {isMe && !isDeleted && (
+                        <span className="text-[10px] text-slate-400">
+                          Seen by {msg.read_by_count || 0}
+                        </span>
+                      )}
+                      {canDelete && !isDeleted && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(msg)}
+                          className="ml-1 inline-flex items-center gap-1 hover:text-rose-500 transition-colors"
+                          title="Delete message"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

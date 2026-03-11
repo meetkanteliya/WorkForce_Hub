@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import ChatMessage, CompanyChatMessage
+from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageRead
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.CharField(source='sender.username', read_only=True)
@@ -46,6 +46,10 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
     timestamp = serializers.DateTimeField(source="created_at", read_only=True)
     attachment_url = serializers.SerializerMethodField()
     attachment = serializers.FileField(write_only=True, required=False, allow_null=True)
+    is_deleted = serializers.BooleanField(read_only=True)
+    deleted_at = serializers.DateTimeField(read_only=True)
+    deleted_by = ChatEmployeePublicSerializer(read_only=True)
+    read_by_count = serializers.SerializerMethodField()
 
     class Meta:
         model = CompanyChatMessage
@@ -58,6 +62,10 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
             "attachment_url",
             "attachment_name",
             "attachment_mime",
+            "is_deleted",
+            "deleted_at",
+            "deleted_by",
+            "read_by_count",
         )
 
     def get_attachment_url(self, obj):
@@ -79,3 +87,7 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
             validated_data["attachment_name"] = validated_data.get("attachment_name") or getattr(attachment, "name", "") or ""
             validated_data["attachment_mime"] = validated_data.get("attachment_mime") or getattr(attachment, "content_type", "") or ""
         return super().create(validated_data)
+
+    def get_read_by_count(self, obj):
+        # Exclude sender from "seen by"
+        return CompanyChatMessageRead.objects.filter(message=obj).exclude(user_id=obj.sender_id).count()
