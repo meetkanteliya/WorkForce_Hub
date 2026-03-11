@@ -9,6 +9,7 @@ DEBUG = env_config('DEBUG', cast=bool, default=True)
 ALLOWED_HOSTS = env_config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -22,10 +23,12 @@ INSTALLED_APPS = [
     'drf_spectacular',
 
     'accounts',
-    'employees',
+    'employees.apps.EmployeesConfig',
     'leaves',
     'payroll',
     'dashboard',
+    'chat',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -43,6 +46,13 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 TEMPLATES = [
     {

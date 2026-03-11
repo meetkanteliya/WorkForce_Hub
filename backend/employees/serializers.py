@@ -14,9 +14,15 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 
 class UserMiniSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ("id", "username", "email", "role", "is_active")
+        fields = ("id", "username", "first_name", "last_name", "full_name", "email", "role", "is_active")
+
+    def get_full_name(self, obj):
+        name = (obj.get_full_name() or "").strip()
+        return name or obj.username
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
@@ -27,6 +33,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
     role = serializers.CharField(write_only=True, required=False)
+    first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     department_name = serializers.CharField(source="department.name", read_only=True, default="Unassigned")
     is_on_leave_today = serializers.SerializerMethodField()
 
@@ -40,6 +48,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "username",
             "password",
             "role",
+            "first_name",
+            "last_name",
             "employee_code",
             "department",
             "department_name",
@@ -69,6 +79,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
         username = validated_data.pop("username", None)
         password = validated_data.pop("password", None)
         role = validated_data.pop("role", "employee")
+        first_name = validated_data.pop("first_name", "")
+        last_name = validated_data.pop("last_name", "")
 
         if user_id:
             user = User.objects.get(id=user_id)
@@ -84,14 +96,27 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 password=password,
                 role=role
             )
+        if first_name is not None:
+            user.first_name = first_name
+        if last_name is not None:
+            user.last_name = last_name
+        if first_name is not None or last_name is not None:
+            user.save()
             
         return Employee.objects.create(user=user, **validated_data)
 
     def update(self, instance, validated_data):
         email = validated_data.pop("email", None)
+        first_name = validated_data.pop("first_name", None)
+        last_name = validated_data.pop("last_name", None)
 
         if email:
             instance.user.email = email
+        if first_name is not None:
+            instance.user.first_name = first_name
+        if last_name is not None:
+            instance.user.last_name = last_name
+        if email or first_name is not None or last_name is not None:
             instance.user.save()
 
         return super().update(instance, validated_data)
@@ -99,11 +124,15 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class EmployeeProfileUpdateSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=False)
     department_id = serializers.IntegerField(required=False, write_only=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = Employee
         fields = (
             "email",
+            "first_name",
+            "last_name",
             "phone",
             "address",
             "city",
@@ -125,7 +154,9 @@ class EmployeeProfileUpdateSerializer(serializers.ModelSerializer):
             allowed_fields = [
                 'phone', 'address', 'city', 
                 'emergency_contact_name', 'emergency_contact_phone', 'email',
-                'profile_picture'
+                'profile_picture',
+                'first_name',
+                'last_name',
             ]
             for key in list(validated_data.keys()):
                 if key not in allowed_fields:
@@ -134,6 +165,13 @@ class EmployeeProfileUpdateSerializer(serializers.ModelSerializer):
         email = validated_data.pop("email", None)
         if email:
             instance.user.email = email
+        first_name = validated_data.pop("first_name", None)
+        last_name = validated_data.pop("last_name", None)
+        if first_name is not None:
+            instance.user.first_name = first_name
+        if last_name is not None:
+            instance.user.last_name = last_name
+        if email or first_name is not None or last_name is not None:
             instance.user.save()
             
         department_id = validated_data.pop("department_id", None)
