@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import {
     Plus, CheckCircle, XCircle, Clock4, Search,
     Scale, ChevronDown, Pencil, Save, X, Eye
@@ -51,6 +53,9 @@ export default function LeaveRequestList() {
     
     // ─── Modal State ───
     const [selectedEmployeeBalances, setSelectedEmployeeBalances] = useState(null);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertVariant, setAlertVariant] = useState('error');
 
     // ─── Pagination ───
     const [currentPage, setCurrentPage] = useState(1);
@@ -107,7 +112,9 @@ export default function LeaveRequestList() {
             );
         } catch (err) {
             const detail = err.response?.data?.detail;
-            alert(detail || `Failed to ${action} leave`);
+            setAlertMessage(detail || `Failed to ${action} leave`);
+            setAlertVariant('error');
+            setAlertOpen(true);
         }
     };
 
@@ -118,7 +125,9 @@ export default function LeaveRequestList() {
             const maxAllowed = base + 3;
 
             if (Number.isFinite(allocatedNext) && allocatedNext > maxAllowed) {
-                alert("Maximum extra leave limit exceeded. Only +3 additional leaves allowed.");
+                setAlertMessage("Maximum extra leave limit exceeded. Only +3 additional leaves allowed.");
+                setAlertVariant('warning');
+                setAlertOpen(true);
                 return;
             }
 
@@ -141,7 +150,9 @@ export default function LeaveRequestList() {
             setEditingId(null);
         } catch (err) {
             console.error('Adjust balance error:', err.response?.data || err.message);
-            alert(err.response?.data?.detail || 'Failed to adjust balance');
+            setAlertMessage(err.response?.data?.detail || 'Failed to adjust balance');
+            setAlertVariant('error');
+            setAlertOpen(true);
         }
     };
 
@@ -541,10 +552,13 @@ export default function LeaveRequestList() {
                 )
             )}
             
-            {/* ─── MODAL: Employee Leave Details ─── */}
-            {selectedEmployeeBalances && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-3xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* ─── MODAL: Employee Leave Details (portaled so always centered in viewport) ─── */}
+            {selectedEmployeeBalances && createPortal(
+                <div
+                    className="fixed inset-0 z-[60] flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+                    onClick={(e) => e.target === e.currentTarget && (setSelectedEmployeeBalances(null), setEditingId(null))}
+                >
+                    <div className="my-auto flex-shrink-0 w-full max-w-3xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] overflow-hidden flex flex-col max-h-[90vh]">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                             <div className="flex items-center gap-3">
@@ -646,8 +660,16 @@ export default function LeaveRequestList() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
+
+            <AlertModal
+                open={alertOpen}
+                message={alertMessage}
+                variant={alertVariant}
+                onClose={() => setAlertOpen(false)}
+            />
         </div>
     );
 }

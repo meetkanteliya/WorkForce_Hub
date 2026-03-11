@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi';
 
 export default function DepartmentList() {
     const { hasRole } = useAuth();
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [departmentToDelete, setDepartmentToDelete] = useState(null);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -32,16 +36,22 @@ export default function DepartmentList() {
     const currentDepartments = departments.slice(startIndex, startIndex + itemsPerPage);
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this department?')) return;
+        const dept = departments.find((d) => d.id === id);
+        setDepartmentToDelete(dept ? { id, name: dept.name } : { id, name: 'this department' });
+    };
+
+    const confirmDelete = async () => {
+        if (!departmentToDelete) return;
         try {
-            await API.delete(`/departments/${id}/`);
-            setDepartments((prev) => prev.filter((d) => d.id !== id));
-            // Edge case: if last item on page deleted
+            await API.delete(`/departments/${departmentToDelete.id}/`);
+            setDepartments((prev) => prev.filter((d) => d.id !== departmentToDelete.id));
             if (currentDepartments.length === 1 && currentPage > 1) {
                 setCurrentPage(currentPage - 1);
             }
+            setDepartmentToDelete(null);
         } catch {
-            alert('Failed to delete department');
+            setAlertMessage('Failed to delete department');
+            setAlertOpen(true);
         }
     };
 
@@ -154,6 +164,29 @@ export default function DepartmentList() {
                     )}
                 </div>
             )}
+
+            {/* Delete confirmation modal */}
+            {departmentToDelete && (
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={(e) => e.target === e.currentTarget && setDepartmentToDelete(null)}>
+                    <div className="my-auto flex-shrink-0 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] shadow-xl p-6 animate-slide-up">
+                        <div className="flex items-center gap-3 text-rose-600 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
+                                <HiOutlineTrash className="w-5 h-5 text-rose-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Department</h3>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                            Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-white">{departmentToDelete.name}</span>? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setDepartmentToDelete(null)} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                            <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant="error" onClose={() => setAlertOpen(false)} />
         </div>
     );
 }

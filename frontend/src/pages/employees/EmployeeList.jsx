@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import { HiOutlinePlus, HiOutlineEye, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineMail, HiOutlinePhone, HiOutlineFilter, HiOutlineDotsHorizontal } from 'react-icons/hi';
 
 export default function EmployeeList() {
@@ -23,6 +24,8 @@ export default function EmployeeList() {
     const [loading, setLoading] = useState(true);
     const [employeeToDelete, setEmployeeToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
 
     const fetchEmployees = async () => {
         try {
@@ -51,7 +54,8 @@ export default function EmployeeList() {
             setEmployees((prev) => prev.filter((e) => e.id !== employeeToDelete.id));
             setEmployeeToDelete(null);
         } catch {
-            alert('Failed to delete employee');
+            setAlertMessage('Failed to delete employee');
+            setAlertOpen(true);
         } finally {
             setIsDeleting(false);
         }
@@ -322,7 +326,7 @@ export default function EmployeeList() {
 
             {/* Custom Delete Confirmation Modal */}
             {employeeToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
                     <div className="bg-white dark:bg-[#1E293B] rounded-2xl p-6 shadow-xl max-w-sm w-full border border-slate-200 dark:border-slate-700 animate-slide-up">
                         <div className="flex items-center gap-3 text-rose-600 mb-4">
                             <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
@@ -356,6 +360,8 @@ export default function EmployeeList() {
                     </div>
                 </div>
             )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant="error" onClose={() => setAlertOpen(false)} />
         </div>
     );
 }

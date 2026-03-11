@@ -3,6 +3,7 @@ import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
+import AlertModal from '../components/AlertModal';
 import {
     Mail,
     Phone,
@@ -30,6 +31,9 @@ export default function Profile() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertVariant, setAlertVariant] = useState('error');
 
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
@@ -98,7 +102,9 @@ export default function Profile() {
             setIsEditing(false);
         } catch (err) {
             console.error("Failed to save profile", err);
-            alert("Failed to save profile: " + (err.response?.data?.detail || JSON.stringify(err.response?.data) || "Unknown error"));
+            setAlertMessage("Failed to save profile: " + (err.response?.data?.detail || JSON.stringify(err.response?.data) || "Unknown error"));
+            setAlertVariant('error');
+            setAlertOpen(true);
         } finally {
             setSaving(false);
         }
@@ -175,7 +181,9 @@ export default function Profile() {
             setCropImage(null);
         } catch (err) {
             console.error('Upload error:', err);
-            alert('Failed to upload picture');
+            setAlertMessage('Failed to upload picture');
+            setAlertVariant('error');
+            setAlertOpen(true);
         } finally {
             setUploading(false);
         }
@@ -462,8 +470,8 @@ export default function Profile() {
 
             {/* Custom Save Modal */}
             {showSaveModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200">
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
                         <div className="p-6 text-center">
                             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
                                 <Check className="w-8 h-8 text-emerald-500" strokeWidth={2} />
@@ -492,6 +500,8 @@ export default function Profile() {
                     </div>
                 </div>
             )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant={alertVariant} onClose={() => setAlertOpen(false)} />
         </div>
     );
 }
