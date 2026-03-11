@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -166,24 +167,35 @@ export default function DepartmentList() {
             )}
 
             {/* Delete confirmation modal */}
-            {departmentToDelete && (
+            {departmentToDelete && createPortal(
                 <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={(e) => e.target === e.currentTarget && setDepartmentToDelete(null)}>
-                    <div className="my-auto flex-shrink-0 w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] shadow-xl p-6 animate-slide-up">
-                        <div className="flex items-center gap-3 text-rose-600 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
-                                <HiOutlineTrash className="w-5 h-5 text-rose-600" />
+                    <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-rose-50">
+                                <HiOutlineTrash className="w-8 h-8 text-rose-500" strokeWidth={2} />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Department</h3>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Delete Department</h3>
+                            <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
+                                Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-white">{departmentToDelete.name}</span>? This action cannot be undone.
+                            </p>
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-                            Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-white">{departmentToDelete.name}</span>? This action cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setDepartmentToDelete(null)} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                            <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors">Delete</button>
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex gap-3 border-t border-slate-100 dark:border-slate-700">
+                            <button
+                                onClick={() => setDepartmentToDelete(null)}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-sm shadow-rose-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/50 flex items-center justify-center"
+                            >
+                                Yes, Delete
+                            </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <AlertModal open={alertOpen} message={alertMessage} variant="error" onClose={() => setAlertOpen(false)} />

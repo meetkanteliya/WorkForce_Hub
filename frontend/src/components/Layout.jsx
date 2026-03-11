@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -19,15 +20,17 @@ import {
     Trash2,
     Sun,
     Moon,
+    MessageSquare,
 } from 'lucide-react';
 
 const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: null },
     { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'hr', 'manager'] },
-    { to: '/departments', label: 'Departments', icon: Building2, roles: null },
+    { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin', 'hr'] },
     { to: '/leaves', label: 'Leaves', icon: CalendarClock, roles: null },
-    { to: '/payroll', label: 'Payroll', icon: WalletCards, roles: ['admin', 'hr', 'manager'] },
+    { to: '/payroll', label: 'Payroll', icon: WalletCards, roles: ['admin', 'hr'] },
     { to: '/my-salary', label: 'My Salary', icon: WalletCards, roles: ['employee', 'manager', 'hr'] },
+    { to: '/chat', label: 'Team Chat', icon: MessageSquare, roles: null },
     { to: '/profile', label: 'Profile', icon: UserCircle2, roles: null },
     { to: '/change-password', label: 'Change Password', icon: KeyRound, roles: null },
 ];
@@ -123,6 +126,7 @@ export default function Layout() {
         departments: 'Departments',
         leaves: 'Leave Management',
         payroll: 'Payroll',
+        chat: 'Team Chat',
         profile: 'My Profile',
         'change-password': 'Change Password',
     };
@@ -331,7 +335,7 @@ export default function Layout() {
             </div>
 
             {/* Custom Logout Modal */}
-            {showLogoutModal && (
+            {showLogoutModal && createPortal(
                 <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
                     <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
                         <div className="p-6 text-center">
@@ -358,7 +362,8 @@ export default function Layout() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
