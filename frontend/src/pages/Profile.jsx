@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
+import AlertModal from '../components/AlertModal';
 import {
     Mail,
     Phone,
@@ -30,6 +32,9 @@ export default function Profile() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertVariant, setAlertVariant] = useState('error');
 
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({});
@@ -43,7 +48,11 @@ export default function Profile() {
             ]);
 
             setEmployee(empRes.data);
-            setFormData(empRes.data);
+            setFormData({
+                ...empRes.data,
+                first_name: empRes.data?.user?.first_name || '',
+                last_name: empRes.data?.user?.last_name || '',
+            });
 
             const payslips = payrollRes.data;
             if (payslips && payslips.length > 0) {
@@ -98,7 +107,9 @@ export default function Profile() {
             setIsEditing(false);
         } catch (err) {
             console.error("Failed to save profile", err);
-            alert("Failed to save profile: " + (err.response?.data?.detail || JSON.stringify(err.response?.data) || "Unknown error"));
+            setAlertMessage("Failed to save profile: " + (err.response?.data?.detail || JSON.stringify(err.response?.data) || "Unknown error"));
+            setAlertVariant('error');
+            setAlertOpen(true);
         } finally {
             setSaving(false);
         }
@@ -175,7 +186,9 @@ export default function Profile() {
             setCropImage(null);
         } catch (err) {
             console.error('Upload error:', err);
-            alert('Failed to upload picture');
+            setAlertMessage('Failed to upload picture');
+            setAlertVariant('error');
+            setAlertOpen(true);
         } finally {
             setUploading(false);
         }
@@ -205,7 +218,7 @@ export default function Profile() {
                     </div>
 
                     {/* Full-size Image Preview */}
-                    {showPreview && (
+                    {showPreview && createPortal(
                         <div
                             className="fixed inset-0 bg-black/85 z-50 flex items-center justify-center cursor-pointer animate-fade-in"
                             onClick={() => setShowPreview(false)}
@@ -223,11 +236,12 @@ export default function Profile() {
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-                        </div>
+                        </div>,
+                        document.body
                     )}
 
                     {/* Crop Modal */}
-                    {cropImage && (
+                    {cropImage && createPortal(
                         <div className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center animate-fade-in">
                             <div className="relative w-[90vw] max-w-md h-[70vh] max-h-[400px]">
                                 <Cropper
@@ -259,7 +273,8 @@ export default function Profile() {
                                     className="px-6 py-2.5 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all disabled:opacity-50"
                                 >{uploading ? 'Saving...' : 'Save'}</button>
                             </div>
-                        </div>
+                        </div>,
+                        document.body
                     )}
                     <div className="flex-1 mt-2 text-center md:text-left">
                         <h1 className="text-2xl font-bold text-slate-100 tracking-tight">{user?.username}</h1>
@@ -285,8 +300,9 @@ export default function Profile() {
                             )}
                         </div>
                     </div>
-                    <div className="mt-4 md:mt-2">
+                    <div className="mt-4 md:mt-2 flex items-center gap-3">
                         <button
+                            type="button"
                             onClick={handleEditToggle}
                             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm border ${isEditing
                                 ? 'bg-slate-700 text-white border-slate-600 hover:bg-slate-600'
@@ -299,6 +315,26 @@ export default function Profile() {
                                 <><Edit2 className="w-4 h-4" /> Edit Profile</>
                             )}
                         </button>
+                        
+                        {isEditing && (
+                            <button
+                                type="button"
+                                onClick={handleSaveClick}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-sm border border-emerald-500 transition-all focus:ring-4 focus:ring-emerald-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {saving ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" strokeWidth={3} /> Save
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -314,6 +350,22 @@ export default function Profile() {
                         </h2>
                         <div className="space-y-5">
                             <InfoField icon={AtSign} label="System Username" value={user?.username || '—'} isEditing={false} />
+                            <InfoField
+                                icon={UserCircle}
+                                label="First Name"
+                                name="first_name"
+                                value={isEditing ? formData.first_name || '' : (employee?.user?.first_name || '—')}
+                                onChange={handleChange}
+                                isEditing={isEditing}
+                            />
+                            <InfoField
+                                icon={UserCircle}
+                                label="Last Name"
+                                name="last_name"
+                                value={isEditing ? formData.last_name || '' : (employee?.user?.last_name || '—')}
+                                onChange={handleChange}
+                                isEditing={isEditing}
+                            />
                             <InfoField
                                 icon={Mail}
                                 label="Registered Email"
@@ -417,34 +469,7 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* Fixed Save Bar */}
-                    {isEditing && (
-                        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40 lg:pl-64 flex justify-end gap-3 px-6 animate-slide-up">
-                            <button
-                                type="button"
-                                onClick={handleEditToggle}
-                                className="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors border border-transparent"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={saving}
-                                className="flex items-center gap-2 px-8 py-2.5 rounded-xl font-bold text-white bg-[#1A2B3C] hover:bg-[#0F172A] shadow-lg shadow-[#1A2B3C]/20 border border-[#1A2B3C] transition-all focus:ring-4 focus:ring-[#1A2B3C]/10 target:scale-[0.98]"
-                            >
-                                {saving ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check className="w-5 h-5" strokeWidth={3} /> Save Profile Changes
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    )}
+                    {/* Removed Fixed Save Bar */}
                 </form>
             ) : (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex items-start gap-4 text-amber-800 shadow-sm">
@@ -461,9 +486,9 @@ export default function Profile() {
             )}
 
             {/* Custom Save Modal */}
-            {showSaveModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200">
+            {showSaveModal && createPortal(
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
                         <div className="p-6 text-center">
                             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
                                 <Check className="w-8 h-8 text-emerald-500" strokeWidth={2} />
@@ -490,8 +515,11 @@ export default function Profile() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant={alertVariant} onClose={() => setAlertOpen(false)} />
         </div>
     );
 }

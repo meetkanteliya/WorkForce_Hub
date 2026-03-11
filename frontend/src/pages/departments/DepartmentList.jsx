@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import { HiOutlinePlus, HiOutlinePencil, HiOutlineTrash } from 'react-icons/hi';
 
 export default function DepartmentList() {
     const { hasRole } = useAuth();
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [departmentToDelete, setDepartmentToDelete] = useState(null);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -32,16 +37,22 @@ export default function DepartmentList() {
     const currentDepartments = departments.slice(startIndex, startIndex + itemsPerPage);
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this department?')) return;
+        const dept = departments.find((d) => d.id === id);
+        setDepartmentToDelete(dept ? { id, name: dept.name } : { id, name: 'this department' });
+    };
+
+    const confirmDelete = async () => {
+        if (!departmentToDelete) return;
         try {
-            await API.delete(`/departments/${id}/`);
-            setDepartments((prev) => prev.filter((d) => d.id !== id));
-            // Edge case: if last item on page deleted
+            await API.delete(`/departments/${departmentToDelete.id}/`);
+            setDepartments((prev) => prev.filter((d) => d.id !== departmentToDelete.id));
             if (currentDepartments.length === 1 && currentPage > 1) {
                 setCurrentPage(currentPage - 1);
             }
+            setDepartmentToDelete(null);
         } catch {
-            alert('Failed to delete department');
+            setAlertMessage('Failed to delete department');
+            setAlertOpen(true);
         }
     };
 
@@ -154,6 +165,40 @@ export default function DepartmentList() {
                     )}
                 </div>
             )}
+
+            {/* Delete confirmation modal */}
+            {departmentToDelete && createPortal(
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={(e) => e.target === e.currentTarget && setDepartmentToDelete(null)}>
+                    <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-rose-50">
+                                <HiOutlineTrash className="w-8 h-8 text-rose-500" strokeWidth={2} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Delete Department</h3>
+                            <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
+                                Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-white">{departmentToDelete.name}</span>? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex gap-3 border-t border-slate-100 dark:border-slate-700">
+                            <button
+                                onClick={() => setDepartmentToDelete(null)}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-sm shadow-rose-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/50 flex items-center justify-center"
+                            >
+                                Yes, Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant="error" onClose={() => setAlertOpen(false)} />
         </div>
     );
 }

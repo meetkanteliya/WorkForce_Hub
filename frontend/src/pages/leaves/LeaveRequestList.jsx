@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 import { Link, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import {
     Plus, CheckCircle, XCircle, Clock4, Search,
     Scale, ChevronDown, Pencil, Save, X, Eye
@@ -13,20 +16,7 @@ const statusStyles = {
     rejected: 'bg-rose-100/80 text-rose-700 border border-rose-200/50',
 };
 
-const DEFAULT_LEAVE_ALLOCATIONS = {
-    'sick leave': 12,
-    'casual leave': 10,
-    'earned leave': 15,
-    'work from home': 20,
-};
-
-function normalizeLeaveTypeName(name) {
-    return (name || '').trim().toLowerCase().split(/\s+/).join(' ');
-}
-
 function getBaseAllocation(leaveType) {
-    const normalized = normalizeLeaveTypeName(leaveType?.name);
-    if (DEFAULT_LEAVE_ALLOCATIONS[normalized] != null) return DEFAULT_LEAVE_ALLOCATIONS[normalized];
     const fallback = Number(leaveType?.max_days_per_year);
     return Number.isFinite(fallback) ? fallback : 0;
 }
@@ -36,11 +26,14 @@ export default function LeaveRequestList() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState(searchParams.get('tab') || 'all');
+    const [tab, setTab] = useState(searchParams.get('tab') || (hasRole('admin', 'hr') ? 'all' : 'my'));
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+
     const [departmentFilter, setDepartmentFilter] = useState('All');
+    
+    // Dynamic Departments
+    const [departments, setDepartments] = useState([]);
 
     // Balance management state
     const [balances, setBalances] = useState([]);
@@ -51,6 +44,9 @@ export default function LeaveRequestList() {
     
     // ─── Modal State ───
     const [selectedEmployeeBalances, setSelectedEmployeeBalances] = useState(null);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertVariant, setAlertVariant] = useState('error');
 
     // ─── Pagination ───
     const [currentPage, setCurrentPage] = useState(1);
@@ -58,7 +54,7 @@ export default function LeaveRequestList() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [tab, statusFilter, searchQuery, dateFilter, balanceSearch, departmentFilter, itemsPerPage]);
+    }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter, itemsPerPage]);
 
     // ─── Fetch leave requests ───
     const fetchRequests = async (currentTab) => {
@@ -90,6 +86,19 @@ export default function LeaveRequestList() {
             fetchRequests(tab);
         }
     }, [tab]);
+    
+    // Fetch live departments for filters
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const res = await API.get('/departments/');
+                setDepartments(res.data.results ?? res.data);
+            } catch (err) {
+                console.error('[LeaveRequestList] Failed to fetch departments', err);
+            }
+        };
+        fetchDepartments();
+    }, []);
 
     // Sync URL params
     useEffect(() => {
@@ -107,7 +116,9 @@ export default function LeaveRequestList() {
             );
         } catch (err) {
             const detail = err.response?.data?.detail;
-            alert(detail || `Failed to ${action} leave`);
+            setAlertMessage(detail || `Failed to ${action} leave`);
+            setAlertVariant('error');
+            setAlertOpen(true);
         }
     };
 
@@ -118,7 +129,9 @@ export default function LeaveRequestList() {
             const maxAllowed = base + 3;
 
             if (Number.isFinite(allocatedNext) && allocatedNext > maxAllowed) {
-                alert("Maximum extra leave limit exceeded. Only +3 additional leaves allowed.");
+                setAlertMessage("Maximum extra leave limit exceeded. Only +3 additional leaves allowed.");
+                setAlertVariant('warning');
+                setAlertOpen(true);
                 return;
             }
 
@@ -141,7 +154,9 @@ export default function LeaveRequestList() {
             setEditingId(null);
         } catch (err) {
             console.error('Adjust balance error:', err.response?.data || err.message);
-            alert(err.response?.data?.detail || 'Failed to adjust balance');
+            setAlertMessage(err.response?.data?.detail || 'Failed to adjust balance');
+            setAlertVariant('error');
+            setAlertOpen(true);
         }
     };
 
@@ -157,14 +172,7 @@ export default function LeaveRequestList() {
             (req.employee || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
             (req.leave_type_name || '').toLowerCase().includes(searchQuery.toLowerCase())
         )
-        .filter(req => {
-            if (!dateFilter) return true;
-            // Assuming req.start_date and req.end_date are in YYYY-MM-DD format
-            const target = new Date(dateFilter).getTime();
-            const start = new Date(req.start_date).getTime();
-            const end = new Date(req.end_date).getTime();
-            return target >= start && target <= end;
-        })
+
         .filter(req => {
             if (departmentFilter === 'All') return true;
             return (req.employee_department || 'Unassigned') === departmentFilter;
@@ -261,10 +269,11 @@ export default function LeaveRequestList() {
             </div>
 
             {/* Tabs & Filters */}
-            <div className="glass-panel dark:bg-[#111827]/40 flex flex-col sm:flex-row gap-4 justify-between items-center p-4 rounded-xl border-slate-200 dark:border-slate-800">
-                <div className="flex gap-1.5 bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-1 w-full sm:w-auto">
+            <div className="glass-panel dark:bg-[#111827]/40 flex flex-wrap gap-3 justify-between items-center p-3 rounded-xl border-slate-200 dark:border-slate-800">
+                {/* Tabs */}
+                <div className="flex flex-nowrap gap-1 bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-1 w-full xl:w-auto overflow-x-auto no-scrollbar shrink-0">
                     <TabButton active={tab === 'all'} onClick={() => { setTab('all'); setStatusFilter('all'); }}>
-                        {hasRole('admin', 'hr', 'manager') ? 'All Requests' : 'All'}
+                        {hasRole('admin', 'hr', 'manager') ? 'All Requests' : 'All Requests'}
                     </TabButton>
                     {!hasRole('admin') && (
                         <TabButton active={tab === 'my'} onClick={() => { setTab('my'); setStatusFilter('all'); }}>
@@ -279,14 +288,15 @@ export default function LeaveRequestList() {
                     )}
                 </div>
 
+                {/* Filters */}
                 {tab !== 'balances' ? (
-                    <div className="flex gap-3 items-center w-full sm:w-auto">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full xl:w-auto flex-1 xl:flex-none justify-end">
                         {/* Status Filter */}
-                        <div className="relative">
+                        <div className="relative min-w-[140px] shrink-0">
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                                className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                             >
                                 <option value="all">All Status</option>
                                 <option value="pending">Pending</option>
@@ -296,44 +306,24 @@ export default function LeaveRequestList() {
                             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
                         {/* Department Filter */}
-                        <div className="relative">
-                            <select
-                                value={departmentFilter}
-                                onChange={(e) => setDepartmentFilter(e.target.value)}
-                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
-                            >
-                                <option value="All">All Departments</option>
-                                <option value="IT">IT</option>
-                                <option value="Engineering">Engineering</option>
-                                <option value="HR / Human Resources">HR / Human Resources</option>
-                                <option value="Finance">Finance</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Operations">Operations</option>
-                            </select>
-                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
-                        {/* Date Filter (Admin/HR/Manager only) */}
                         {hasRole('admin', 'hr', 'manager') && (
-                            <div className="relative">
-                                <input
-                                    type="date"
-                                    value={dateFilter}
-                                    onChange={(e) => setDateFilter(e.target.value)}
-                                    className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
-                                />
-                                {dateFilter && (
-                                    <button
-                                        onClick={() => setDateFilter('')}
-                                        className="absolute right-8 top-1/2 -translate-y-1/2 p-0.5 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"
-                                        title="Clear Date"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                )}
+                            <div className="relative min-w-[180px] shrink-0">
+                                <select
+                                    value={departmentFilter}
+                                    onChange={(e) => setDepartmentFilter(e.target.value)}
+                                    className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                                >
+                                    <option value="All">All Departments</option>
+                                    {departments.map((dept) => (
+                                        <option key={dept.id} value={dept.name}>{dept.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                             </div>
                         )}
+
                         {/* Search */}
-                        <div className="relative flex-1 sm:w-56">
+                        <div className="relative flex-1 min-w-[150px] shrink-0 xl:w-56">
                             <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
@@ -345,26 +335,23 @@ export default function LeaveRequestList() {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex gap-3 items-center w-full sm:w-auto">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full xl:w-auto flex-1 xl:flex-none justify-end">
                         {/* Department Filter for Balances */}
-                        <div className="relative">
+                        <div className="relative min-w-[180px] shrink-0">
                             <select
                                 value={departmentFilter}
                                 onChange={(e) => setDepartmentFilter(e.target.value)}
-                                className="appearance-none bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
+                                className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                             >
                                 <option value="All">All Departments</option>
-                                <option value="IT">IT</option>
-                                <option value="Engineering">Engineering</option>
-                                <option value="HR / Human Resources">HR / Human Resources</option>
-                                <option value="Finance">Finance</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Operations">Operations</option>
+                                {departments.map((dept) => (
+                                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                                ))}
                             </select>
                             <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
                         {/* Search for Balances */}
-                        <div className="relative flex-1 sm:w-64">
+                        <div className="relative flex-1 min-w-[180px] shrink-0 xl:w-64">
                             <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
@@ -541,10 +528,13 @@ export default function LeaveRequestList() {
                 )
             )}
             
-            {/* ─── MODAL: Employee Leave Details ─── */}
-            {selectedEmployeeBalances && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-3xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* ─── MODAL: Employee Leave Details (portaled so always centered in viewport) ─── */}
+            {selectedEmployeeBalances && createPortal(
+                <div
+                    className="fixed inset-0 z-[60] flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+                    onClick={(e) => e.target === e.currentTarget && (setSelectedEmployeeBalances(null), setEditingId(null))}
+                >
+                    <div className="my-auto flex-shrink-0 w-full max-w-3xl rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1E293B] overflow-hidden flex flex-col max-h-[90vh]">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                             <div className="flex items-center gap-3">
@@ -634,7 +624,7 @@ export default function LeaveRequestList() {
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             <button onClick={() => startEdit(b)}
-                                                                className="p-1.5 text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200/50 transition-colors opacity-0 group-hover:opacity-100"
+                                                                className="p-1.5 text-[#2563EB] bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200/50 transition-colors"
                                                                 title="Adjust Balance"><Pencil className="w-4 h-4" /></button>
                                                         </td>
                                                     </>
@@ -646,8 +636,16 @@ export default function LeaveRequestList() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
+
+            <AlertModal
+                open={alertOpen}
+                message={alertMessage}
+                variant={alertVariant}
+                onClose={() => setAlertOpen(false)}
+            />
         </div>
     );
 }

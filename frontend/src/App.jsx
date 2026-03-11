@@ -24,6 +24,7 @@ import DashboardLeavesPending from './pages/dashboard/DashboardLeavesPending';
 import DashboardLeaveOverview from './pages/dashboard/DashboardLeaveOverview';
 import DashboardPayroll from './pages/dashboard/DashboardPayroll';
 import DashboardActivity from './pages/dashboard/DashboardActivity';
+import CompanyChat from './pages/chat/CompanyChat';
 
 export default function App() {
   return (
@@ -45,11 +46,12 @@ export default function App() {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="chat" element={<CompanyChat />} />
               <Route path="profile" element={<Profile />} />
               <Route path="change-password" element={<ChangePassword />} />
 
               {/* Departments */}
-              <Route path="departments" element={<DepartmentList />} />
+              <Route path="departments" element={<ProtectedRoute roles={['admin', 'hr']}><DepartmentList /></ProtectedRoute>} />
               <Route path="departments/new" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
               <Route path="departments/:id/edit" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
 
@@ -65,7 +67,7 @@ export default function App() {
               <Route path="leaves/apply" element={<LeaveRequestForm />} />
 
               {/* Payroll */}
-              <Route path="payroll" element={<ProtectedRoute roles={['admin', 'hr', 'manager']}><SalaryList /></ProtectedRoute>} />
+              <Route path="payroll" element={<ProtectedRoute roles={['admin', 'hr']}><SalaryList /></ProtectedRoute>} />
               <Route path="payroll/new" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
               <Route path="payroll/:id/edit" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
               <Route path="my-salary" element={<ProtectedRoute roles={['employee', 'hr', 'manager']}><MySalary /></ProtectedRoute>} />

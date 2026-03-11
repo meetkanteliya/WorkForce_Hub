@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import AlertModal from '../../components/AlertModal';
 import { HiOutlinePlus, HiOutlineEye, HiOutlinePencil, HiOutlineTrash, HiOutlineSearch, HiOutlineMail, HiOutlinePhone, HiOutlineFilter, HiOutlineDotsHorizontal } from 'react-icons/hi';
 
 export default function EmployeeList() {
@@ -9,6 +11,7 @@ export default function EmployeeList() {
     const [employees, setEmployees] = useState([]);
     const [search, setSearch] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('');
+    const [departments, setDepartments] = useState([]);
     const [roleFilter, setRoleFilter] = useState('');
     const [designationFilter, setDesignationFilter] = useState('');
     const [searchParams] = useSearchParams();
@@ -23,6 +26,8 @@ export default function EmployeeList() {
     const [loading, setLoading] = useState(true);
     const [employeeToDelete, setEmployeeToDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
 
     const fetchEmployees = async () => {
         try {
@@ -36,7 +41,19 @@ export default function EmployeeList() {
         }
     };
 
-    useEffect(() => { fetchEmployees(); }, []);
+    useEffect(() => { 
+        fetchEmployees(); 
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const res = await API.get('/departments/');
+            setDepartments(res.data.results ?? res.data);
+        } catch (err) {
+            console.error('Failed to fetch departments:', err);
+        }
+    };
 
     // Reset pagination to page 1 when any filter changes
     useEffect(() => {
@@ -51,7 +68,8 @@ export default function EmployeeList() {
             setEmployees((prev) => prev.filter((e) => e.id !== employeeToDelete.id));
             setEmployeeToDelete(null);
         } catch {
-            alert('Failed to delete employee');
+            setAlertMessage('Failed to delete employee');
+            setAlertOpen(true);
         } finally {
             setIsDeleting(false);
         }
@@ -159,12 +177,9 @@ export default function EmployeeList() {
                         className="w-full appearance-none pl-9 pr-8 py-2.5 bg-white dark:bg-[#111827]/80 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] outline-none text-slate-800 dark:text-white cursor-pointer transition-colors"
                     >
                         <option value="" className="bg-white dark:bg-[#111827]">All Departments</option>
-                        <option value="IT" className="bg-white dark:bg-[#111827]">IT</option>
-                        <option value="Engineering" className="bg-white dark:bg-[#111827]">Engineering</option>
-                        <option value="Human Resources" className="bg-white dark:bg-[#111827]">HR / Human Resources</option>
-                        <option value="Finance" className="bg-white dark:bg-[#111827]">Finance</option>
-                        <option value="Marketing" className="bg-white dark:bg-[#111827]">Marketing</option>
-                        <option value="Operations" className="bg-white dark:bg-[#111827]">Operations</option>
+                        {departments.map((dept) => (
+                            <option key={dept.id} value={dept.name} className="bg-white dark:bg-[#111827]">{dept.name}</option>
+                        ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -321,41 +336,44 @@ export default function EmployeeList() {
             )}
 
             {/* Custom Delete Confirmation Modal */}
-            {employeeToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-[#1E293B] rounded-2xl p-6 shadow-xl max-w-sm w-full border border-slate-200 dark:border-slate-700 animate-slide-up">
-                        <div className="flex items-center gap-3 text-rose-600 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
-                                <HiOutlineTrash className="w-5 h-5 text-rose-600" />
+            {employeeToDelete && createPortal(
+                <div className="fixed inset-0 z-50 flex min-h-screen items-center justify-center overflow-y-auto p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="my-auto flex-shrink-0 bg-white dark:bg-[#1E293B] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-slide-up border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-rose-50">
+                                <HiOutlineTrash className="w-8 h-8 text-rose-500" strokeWidth={2} />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Employee</h3>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Delete Employee</h3>
+                            <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
+                                Are you sure you want to remove <span className="font-bold text-slate-800 dark:text-white">{employeeToDelete.user?.username}</span>? This action cannot be undone.
+                            </p>
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-                            Are you sure you want to remove <span className="font-bold text-slate-800 dark:text-white">{employeeToDelete.user?.username}</span>? This action cannot be undone and will permanently delete their data.
-                        </p>
-                        <div className="flex justify-end gap-3">
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex gap-3 border-t border-slate-100 dark:border-slate-700">
                             <button
                                 onClick={() => setEmployeeToDelete(null)}
                                 disabled={isDeleting}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#1E293B] border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmDelete}
                                 disabled={isDeleting}
-                                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-rose-500 rounded-xl hover:bg-rose-600 shadow-sm shadow-rose-500/30 transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/50 flex items-center justify-center disabled:opacity-50"
                             >
                                 {isDeleting ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 ) : (
-                                    'Delete Permanently'
+                                    'Yes, Delete'
                                 )}
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
+
+            <AlertModal open={alertOpen} message={alertMessage} variant="error" onClose={() => setAlertOpen(false)} />
         </div>
     );
 }
