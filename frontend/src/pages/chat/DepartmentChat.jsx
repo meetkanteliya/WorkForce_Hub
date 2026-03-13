@@ -3,6 +3,14 @@ import { useAuth } from '../../context/AuthContext';
 import API from '../../api/axios';
 import { Send, Hash, MessageSquare, Clock } from 'lucide-react';
 
+function getWsOrigin() {
+    const origin = window.location.origin;
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return 'ws://localhost:8000';
+    }
+    return origin.replace(/^http/, 'ws');
+}
+
 export default function DepartmentChat() {
     const { user } = useAuth();
     const [departments, setDepartments] = useState([]);
@@ -66,7 +74,7 @@ export default function DepartmentChat() {
 
         // Connect WebSocket
         const token = localStorage.getItem('access');
-        const socketUrl = `ws://localhost:8000/ws/chat/${activeDept.id}/?token=${token}`;
+        const socketUrl = `${getWsOrigin()}/ws/chat/${activeDept.id}/?token=${token}`;
         const socket = new WebSocket(socketUrl);
 
         socket.onopen = () => console.log('WebSocket Connected to', activeDept.name);

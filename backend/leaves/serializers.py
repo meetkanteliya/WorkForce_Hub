@@ -76,12 +76,12 @@ class LeaveBalanceWriteSerializer(serializers.ModelSerializer):
         # Only validate allocated_days when it's being set/changed.
         if "allocated_days" in attrs and leave_type is not None:
             base_allocation = get_base_allocation_for_type(leave_type)
-            max_allowed = base_allocation + 3
+            max_allowed = base_allocation + 5
             allocated_days = float(attrs.get("allocated_days") or 0)
 
             if allocated_days > max_allowed:
                 raise serializers.ValidationError(
-                    {"detail": "Maximum extra leave limit exceeded. Only +3 additional leaves allowed."}
+                    {"detail": "Maximum extra leave limit exceeded. Only +5 additional leaves allowed."}
                 )
 
         # Basic sanity: used_days shouldn't exceed allocated_days when both are known.

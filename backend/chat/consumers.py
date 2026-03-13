@@ -1,4 +1,6 @@
 import json
+import logging
+import os
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import ChatMessage, CompanyChatMessage
@@ -8,19 +10,36 @@ import urllib.parse
 import jwt
 from django.conf import settings
 
+# Setup simple file logging for debugging
+logger = logging.getLogger("chat_debug")
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    fh = logging.FileHandler("chat_debug.log")
+    fh.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    logger.addHandler(fh)
+
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.department_id = self.scope['url_route']['kwargs']['department_id']
         self.room_group_name = f'chat_{self.department_id}'
+        
+        logger.debug(f"ChatConsumer connect. Dept: {self.department_id}")
 
-        # Auth via token in query string since WebSocket headers can't be easily set in browser API sometimes.
+        # Auth via token in query string
         query_string = self.scope['query_string'].decode()
         query_params = urllib.parse.parse_qs(query_string)
         token = query_params.get('token', [None])[0]
+        logger.debug(f"Token found: {bool(token)}")
 
         user = await self.get_user_from_token(token)
         
-        if not user or not user.is_active:
+        if not user:
+            logger.debug("User not found from token")
+            await self.close()
+            return
+            
+        if not user.is_active:
+            logger.debug(f"User {user.username} is inactive")
             await self.close()
             return
 
@@ -28,6 +47,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Verify access
         if not await self.check_department_access(user, self.department_id):
+            logger.debug(f"User {user.username} denied access to dept {self.department_id}")
             await self.close()
             return
 
@@ -38,6 +58,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
         await self.accept()
+        logger.debug(f"ChatConsumer connected: {user.username}")
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -83,7 +104,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             return User.objects.get(id=payload['user_id'])
-        except Exception:
+        except Exception as e:
+            logger.debug(f"JWT decode error: {e}")
             return None
 
     @database_sync_to_async
@@ -125,14 +147,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 class CompanyChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        logger.debug("CompanyChatConsumer connect")
         self.room_group_name = "company_chat"
 
         query_string = self.scope['query_string'].decode()
         query_params = urllib.parse.parse_qs(query_string)
         token = query_params.get('token', [None])[0]
+        logger.debug(f"Token found: {bool(token)}")
 
         user = await self.get_user_from_token(token)
-        if not user or not user.is_active or not await self.has_employee_profile(user.id):
+        if not user:
+            logger.debug("User not found from token")
+            await self.close()
+            return
+            
+        if not user.is_active:
+            logger.debug(f"User {user.username} is inactive")
+            await self.close()
+            return
+            
+        if not await self.has_employee_profile(user.id):
+            logger.debug(f"User {user.username} has no employee profile")
             await self.close()
             return
 
@@ -140,8 +175,9 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
+        logger.debug(f"CompanyChatConsumer connected: {user.username}")
 
-        # Broadcast join presence (lightweight)
+        # Broadcast join presence
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -210,7 +246,6 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({"type": "presence", **event}))
 
     async def employee_event(self, event):
-        # Forward employee join/leave/profile updates to clients
         await self.send(text_data=json.dumps({"type": "employee", **event}))
 
     async def company_message_deleted(self, event):
@@ -221,12 +256,12 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_from_token(self, token):
-        if not token:
-            return None
+        if not token: return None
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
             return User.objects.get(id=payload['user_id'])
-        except Exception:
+        except Exception as e:
+            logger.debug(f"JWT decode error: {e}")
             return None
 
     @database_sync_to_async

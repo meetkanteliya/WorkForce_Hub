@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WorkForce Hub – Bug Audit & Fix Guide</title>
+
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #f4f6f9;
+            padding: 40px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #6b7280;
+        }
+
+        .section {
+            margin-top: 40px;
+        }
+
+        .section h2 {
+            background: #1f2937;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        th,
+        td {
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #374151;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background: #f9fafb;
+        }
+
+        .file {
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        .problem {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        .fix {
+            color: #059669;
+        }
+
+        code {
+            background: #eef2f7;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>WorkForce Hub</h1>
+    <div class="subtitle">Project Bug Audit & Fix Guide</div>
+
+    <!-- FRONTEND -->
+
+    <div class="section">
+        <h2>Frontend Issues</h2>
+
+        <table>
+
+            <tr>
+                <th>#</th>
+                <th>File</th>
+                <th>Problem</th>
+                <th>Fix</th>
+            </tr>
+
+            <tr>
+                <td>1</td>
+                <td class="file">axios.js</td>
+                <td class="problem">JSON.parse(localStorage) may crash the app if malformed tokens exist.</td>
+                <td class="fix">Wrap JSON.parse in try/catch.</td>
+            </tr>
+
+            <tr>
+                <td>2</td>
+                <td class="file">AuthContext.jsx</td>
+                <td class="problem">Login flow can leave the app in inconsistent state if profile request fails.</td>
+                <td class="fix">Wrap login process in try/catch and rollback authentication.</td>
+            </tr>
+
+            <tr>
+                <td>3</td>
+                <td class="file">Dashboard.jsx</td>
+                <td class="problem">Dashboard uses mock data instead of backend API.</td>
+                <td class="fix">Replace mock data with API request.</td>
+            </tr>
+
+            <tr>
+                <td>4</td>
+                <td class="file">CompanyChat.jsx</td>
+                <td class="problem">WebSocket does not reconnect when connection drops.</td>
+                <td class="fix">Add reconnect logic in <code>onclose</code>.</td>
+            </tr>
+
+            <tr>
+                <td>5</td>
+                <td class="file">CompanyChat.jsx</td>
+                <td class="problem">Duplicate messages may appear due to optimistic UI update.</td>
+                <td class="fix">Check message ID before adding to state.</td>
+            </tr>
+
+            <tr>
+                <td>6</td>
+                <td class="file">EmployeeList.jsx</td>
+                <td class="problem">Fetching all employees and filtering client-side causes performance issues.</td>
+                <td class="fix">Implement backend pagination.</td>
+            </tr>
+
+            <tr>
+                <td>7</td>
+                <td class="file">LeaveRequestList.jsx</td>
+                <td class="problem">Grouping by employee name may merge records if names are identical.</td>
+                <td class="fix">Group using employee_id instead.</td>
+            </tr>
+
+        </table>
+    </div>
+
+    <!-- BACKEND -->
+
+    <div class="section">
+        <h2>Backend Issues</h2>
+
+        <table>
+
+            <tr>
+                <th>#</th>
+                <th>File</th>
+                <th>Problem</th>
+                <th>Fix</th>
+            </tr>
+
+            <tr>
+                <td>1</td>
+                <td class="file">consumers.py</td>
+                <td class="problem">Manual JWT decoding bypasses authentication middleware.</td>
+                <td class="fix">Use Channels AuthMiddlewareStack or JWT middleware.</td>
+            </tr>
+
+            <tr>
+                <td>2</td>
+                <td class="file">consumers.py</td>
+                <td class="problem">User permissions are checked only on connection.</td>
+                <td class="fix">Recheck permissions inside receive().</td>
+            </tr>
+
+            <tr>
+                <td>3</td>
+                <td class="file">EmployeeSerializer</td>
+                <td class="problem">N+1 query when checking leave status.</td>
+                <td class="fix">Use queryset annotation.</td>
+            </tr>
+
+            <tr>
+                <td>4</td>
+                <td class="file">LeaveRequestViewSet</td>
+                <td class="problem">Leave approval is not atomic, causing race conditions.</td>
+                <td class="fix">Wrap approval logic in transaction.atomic().</td>
+            </tr>
+
+            <tr>
+                <td>5</td>
+                <td class="file">EmployeeSerializer.create</td>
+                <td class="problem">User and Employee creation not wrapped in transaction.</td>
+                <td class="fix">Use transaction.atomic().</td>
+            </tr>
+
+        </table>
+    </div>
+
+    <!-- WEBSOCKET -->
+
+    <div class="section">
+        <h2>WebSocket Issues</h2>
+
+        <table>
+
+            <tr>
+                <th>#</th>
+                <th>Component</th>
+                <th>Problem</th>
+                <th>Fix</th>
+            </tr>
+
+            <tr>
+                <td>1</td>
+                <td class="file">CompanyChatConsumer</td>
+                <td class="problem">Event types inconsistent between frontend and backend.</td>
+                <td class="fix">Standardize event names.</td>
+            </tr>
+
+            <tr>
+                <td>2</td>
+                <td class="file">Department Chat</td>
+                <td class="problem">Typing indicators missing.</td>
+                <td class="fix">Add typing broadcast events.</td>
+            </tr>
+
+            <tr>
+                <td>3</td>
+                <td class="file">Department Chat</td>
+                <td class="problem">Presence join/leave events missing.</td>
+                <td class="fix">Broadcast presence events.</td>
+            </tr>
+
+        </table>
+    </div>
+
+    <!-- IMPROVEMENTS -->
+
+    <div class="section">
+        <h2>Architecture Improvements</h2>
+
+        <table>
+
+            <tr>
+                <th>#</th>
+                <th>Area</th>
+                <th>Improvement</th>
+            </tr>
+
+            <tr>
+                <td>1</td>
+                <td>Chat Attachments</td>
+                <td>Handle attachments via REST API and broadcast using WebSocket.</td>
+            </tr>
+
+            <tr>
+                <td>2</td>
+                <td>Leave System</td>
+                <td>Create leave balances automatically when a new leave type is created.</td>
+            </tr>
+
+            <tr>
+                <td>3</td>
+                <td>Messaging</td>
+                <td>Add read receipts to department chat.</td>
+            </tr>
+
+            <tr>
+                <td>4</td>
+                <td>Leave Requests</td>
+                <td>Add endpoint for employees to cancel pending requests.</td>
+            </tr>
+
+        </table>
+    </div>
+
+    <div class="footer">
+        WorkForce Hub – Technical Audit Documentation
+    </div>
+
+</body>
+
+</html>

@@ -31,7 +31,7 @@ export default function LeaveRequestList() {
     const [searchQuery, setSearchQuery] = useState('');
 
     const [departmentFilter, setDepartmentFilter] = useState('All');
-    
+
     // Dynamic Departments
     const [departments, setDepartments] = useState([]);
 
@@ -41,7 +41,7 @@ export default function LeaveRequestList() {
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ allocated_days: 0, used_days: 0 });
     const [balanceSearch, setBalanceSearch] = useState('');
-    
+
     // ─── Modal State ───
     const [selectedEmployeeBalances, setSelectedEmployeeBalances] = useState(null);
     const [alertOpen, setAlertOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function LeaveRequestList() {
             fetchRequests(tab);
         }
     }, [tab]);
-    
+
     // Fetch live departments for filters
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -143,14 +143,14 @@ export default function LeaveRequestList() {
             setBalances((prev) =>
                 prev.map((b) => (b.id === balance.id ? res.data : b))
             );
-            
+
             // If the modal is open, we need to update the selectedEmployeeBalances state directly so it re-renders
             if (selectedEmployeeBalances) {
-                 setSelectedEmployeeBalances(prev => 
-                      prev.map(b => b.id === balance.id ? res.data : b)
-                 );
+                setSelectedEmployeeBalances(prev =>
+                    prev.map(b => b.id === balance.id ? res.data : b)
+                );
             }
-            
+
             setEditingId(null);
         } catch (err) {
             console.error('Adjust balance error:', err.response?.data || err.message);
@@ -224,18 +224,18 @@ export default function LeaveRequestList() {
                 groupedBalances[key].total_allocated -= parseFloat(oldRec.allocated_days) || 0;
                 groupedBalances[key].total_used -= parseFloat(oldRec.used_days) || 0;
                 groupedBalances[key].total_remaining -= parseFloat(oldRec.remaining_days) || 0;
-                
+
                 // Add new
                 groupedBalances[key].total_allocated += parseFloat(b.allocated_days) || 0;
                 groupedBalances[key].total_used += parseFloat(b.used_days) || 0;
                 groupedBalances[key].total_remaining += parseFloat(b.remaining_days) || 0;
-                
+
                 // Replace
                 groupedBalances[key].records[existingRecordIndex] = b;
             }
         }
     });
-    
+
     const aggregatedBalancesArray = Object.values(groupedBalances).sort((a, b) => a.employee_name.localeCompare(b.employee_name));
 
     // ─── Paginated lists ───
@@ -424,8 +424,8 @@ export default function LeaveRequestList() {
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationFooter 
-                            totalItems={totalBalances} 
+                        <PaginationFooter
+                            totalItems={totalBalances}
                             currentPage={currentPage}
                             itemsPerPage={itemsPerPage}
                             setCurrentPage={setCurrentPage}
@@ -516,8 +516,8 @@ export default function LeaveRequestList() {
                                 </tbody>
                             </table>
                         </div>
-                        <PaginationFooter 
-                            totalItems={totalRequests} 
+                        <PaginationFooter
+                            totalItems={totalRequests}
                             currentPage={currentPage}
                             itemsPerPage={itemsPerPage}
                             setCurrentPage={setCurrentPage}
@@ -527,7 +527,7 @@ export default function LeaveRequestList() {
                     </div>
                 )
             )}
-            
+
             {/* ─── MODAL: Employee Leave Details (portaled so always centered in viewport) ─── */}
             {selectedEmployeeBalances && createPortal(
                 <div
@@ -562,7 +562,7 @@ export default function LeaveRequestList() {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        
+
                         {/* Modal Body */}
                         <div className="overflow-y-auto p-6 flex-1">
                             <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
@@ -694,7 +694,7 @@ function PaginationFooter({ totalItems, currentPage, itemsPerPage, setCurrentPag
                 Showing <span className="font-semibold text-slate-900 dark:text-white">{startIndex + 1}</span>–<span className="font-semibold text-slate-900 dark:text-white">{Math.min(startIndex + itemsPerPage, totalItems)}</span> of <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-                <button 
+                <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -705,11 +705,10 @@ function PaginationFooter({ totalItems, currentPage, itemsPerPage, setCurrentPag
                     <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                            currentPage === page 
-                                ? 'bg-[#10B981] text-white border border-[#10B981]' 
-                                : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
-                        }`}
+                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${currentPage === page
+                            ? 'bg-[#10B981] text-white border border-[#10B981]'
+                            : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
+                            }`}
                     >
                         {page}
                     </button>

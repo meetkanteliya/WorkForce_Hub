@@ -78,9 +78,10 @@ export default function CompanyChat() {
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (e) => {
+      //console.log("WS EVENT RAW:", e.data);
       const data = JSON.parse(e.data);
 
-      if (data.type === 'typing') {
+      if (data.type === "company_typing") {
         if (data.user_id && data.user_id !== meId) {
           setTypingUsers((prev) => {
             const next = new Map(prev);
@@ -115,7 +116,7 @@ export default function CompanyChat() {
         return;
       }
 
-      if (data.type === 'message' && data.payload) {
+      if (data.type === "company_chat_message" && data.payload) {
         setMessages((prev) => [...prev, data.payload]);
 
         const fromOther = data.payload?.sender?.id && data.payload.sender.id !== meId;
@@ -123,7 +124,7 @@ export default function CompanyChat() {
         if (fromOther && isHidden) {
           setUnreadCount((c) => c + 1);
           if ('Notification' in window) {
-            if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+            if (Notification.permission === 'default') Notification.requestPermission().catch(() => { });
             if (Notification.permission === 'granted') {
               new Notification('New company message', {
                 body: `${data.payload.sender.full_name}: ${data.payload.content || 'Attachment'}`,
@@ -158,7 +159,7 @@ export default function CompanyChat() {
     return () => {
       ws.close();
     };
-  }, [tokens?.access, meId, q]);
+  }, [tokens?.access, meId]);
 
   // Scroll + reset unread when focused
   useEffect(() => {
@@ -255,7 +256,7 @@ export default function CompanyChat() {
     readMarkRef.current.lastUpToId = upToId;
     if (readMarkRef.current.timer) clearTimeout(readMarkRef.current.timer);
     readMarkRef.current.timer = setTimeout(() => {
-      API.post('/chat/company/messages/mark-read/', { up_to_id: readMarkRef.current.lastUpToId }).catch(() => {});
+      API.post('/chat/company/messages/mark-read/', { up_to_id: readMarkRef.current.lastUpToId }).catch(() => { });
     }, 600);
   };
 
@@ -362,11 +363,10 @@ export default function CompanyChat() {
                     )}
 
                     <div
-                      className={`px-4 py-2.5 rounded-2xl text-[14px] ${
-                        isMe
-                          ? 'bg-emerald-600 text-white rounded-tr-sm'
-                          : 'bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 shadow-sm rounded-tl-sm'
-                      }`}
+                      className={`px-4 py-2.5 rounded-2xl text-[14px] ${isMe
+                        ? 'bg-emerald-600 text-white rounded-tr-sm'
+                        : 'bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-800 shadow-sm rounded-tl-sm'
+                        }`}
                     >
                       {isDeleted ? (
                         <span className="opacity-70 italic">This message was deleted</span>
@@ -428,6 +428,8 @@ export default function CompanyChat() {
               <Paperclip className="w-5 h-5" />
             </button>
             <input
+              name="message"
+              id="chat-message"
               type="text"
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
@@ -453,4 +455,5 @@ export default function CompanyChat() {
     </div>
   );
 }
+
 
