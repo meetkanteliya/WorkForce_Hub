@@ -58,7 +58,7 @@ export default function Layout() {
     const confirmLogout = () => {
         setShowLogoutModal(false);
         logout();
-        navigate('/login');
+        navigate('/');
     };
 
     const cancelLogout = () => {
