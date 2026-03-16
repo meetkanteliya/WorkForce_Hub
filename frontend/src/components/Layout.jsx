@@ -230,14 +230,14 @@ export default function Layout() {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="lg:hidden p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors -ml-1.5"
+                            className="lg:hidden p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 rounded-lg transition-colors -ml-1.5"
                         >
                             <Menu className="w-5 h-5" />
                         </button>
 
                         <div className="flex items-center text-sm">
-                            <span className="text-slate-400 hidden sm:inline-block">WorkForce Hub</span>
-                            <span className="mx-2 text-slate-300 hidden sm:inline-block">/</span>
+                            <span className="text-slate-400 dark:text-slate-400 hidden sm:inline-block">WorkForce Hub</span>
+                            <span className="mx-2 text-slate-300 dark:text-slate-600 hidden sm:inline-block">/</span>
                             <h2 className="font-semibold text-slate-800 dark:text-white">
                                 {pageTitle[currentPage] || currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}
                             </h2>
@@ -249,7 +249,7 @@ export default function Layout() {
                         <div className="relative" ref={notifRef}>
                             <button
                                 onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifications(); }}
-                                className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                className="relative p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 rounded-lg transition-colors"
                                 title="Notifications"
                             >
                                 <Bell className="w-5 h-5" />
@@ -262,14 +262,14 @@ export default function Layout() {
 
                             {/* Notification Dropdown */}
                             {notifOpen && (
-                                <div className="absolute right-0 mt-2 w-96 max-h-[480px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
-                                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                                <div className="absolute right-0 mt-2 w-96 max-h-[480px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in dark:bg-[#111827] dark:border-slate-700">
+                                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200 dark:bg-[#0F172A] dark:border-slate-700">
                                         <span className="text-sm font-bold text-slate-800 dark:text-white">Notifications</span>
                                         <div className="flex items-center gap-3">
                                             {unreadCount > 0 && (
                                                 <button
                                                     onClick={markAllAsRead}
-                                                    className="flex items-center gap-1 text-[11px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] transition-colors"
+                                                    className="flex items-center gap-1 text-[11px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors"
                                                 >
                                                     <CheckCheck className="w-3.5 h-3.5" />
                                                     Mark all read
@@ -278,7 +278,7 @@ export default function Layout() {
                                             {notifications.length > 0 && (
                                                 <button
                                                     onClick={clearAllNotifications}
-                                                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 transition-colors"
+                                                    className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 dark:hover:text-rose-400 transition-colors"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                     All Clear
@@ -286,10 +286,10 @@ export default function Layout() {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="overflow-y-auto max-h-[400px] divide-y divide-slate-100">
+                                    <div className="overflow-y-auto max-h-[400px] divide-y divide-slate-100 dark:divide-slate-800">
                                         {notifications.length === 0 ? (
-                                            <div className="p-8 text-center text-slate-400">
-                                                <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                            <div className="p-8 text-center text-slate-400 dark:text-slate-400">
+                                                <Bell className="w-8 h-8 text-slate-200 dark:text-slate-700 mx-auto mb-2" />
                                                 <p className="text-sm font-medium">No notifications yet</p>
                                             </div>
                                         ) : (
@@ -297,14 +297,14 @@ export default function Layout() {
                                                 <div
                                                     key={n.id}
                                                     onClick={() => { if (!n.is_read) markAsRead(n.id); if (n.link) { navigate(n.link); setNotifOpen(false); } }}
-                                                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                                                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04] ${!n.is_read ? 'bg-blue-50/40 dark:bg-emerald-500/10' : ''}`}
                                                 >
-                                                    <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.is_read ? 'bg-[#2563EB]' : 'bg-slate-200'}`} />
+                                                    <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.is_read ? 'bg-[#2563EB] dark:bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'}`} />
                                                     <div className="flex-1 min-w-0">
                                                         <p className={`text-[13px] leading-snug ${!n.is_read ? 'font-semibold text-slate-800 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
                                                             {n.message}
                                                         </p>
-                                                        <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
                                                             {new Date(n.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                                         </p>
                                                     </div>
@@ -328,9 +328,9 @@ export default function Layout() {
                             </div>
                         </button>
 
-                        <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-md">
+                        <div className="flex items-center gap-2 px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-md dark:bg-emerald-500/10 dark:border-emerald-500/20">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span className="text-[11px] font-semibold text-emerald-700 tracking-wide">JWT SECURED</span>
+                            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 tracking-wide">JWT SECURED</span>
                         </div>
                     </div>
                 </header>
@@ -356,10 +356,10 @@ export default function Layout() {
                                 Are you sure you want to log out of your WorkForce Hub account?
                             </p>
                         </div>
-                        <div className="px-6 py-4 bg-slate-50 flex gap-3 border-t border-slate-100">
+                        <div className="px-6 py-4 bg-slate-50 dark:bg-[#0F172A] flex gap-3 border-t border-slate-100 dark:border-slate-800">
                             <button
                                 onClick={cancelLogout}
-                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-transparent border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-700"
                             >
                                 Cancel
                             </button>
