@@ -488,7 +488,7 @@ export default function Profile() {
                             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
                                 <Check className="w-8 h-8 text-emerald-500" strokeWidth={2} />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Save Changes</h3>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Save Changes</h3>
                             <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
                                 Are you sure you want to apply these profile changes?
                             </p>

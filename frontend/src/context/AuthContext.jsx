@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 import API from '../api/axios';
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext(null);
 
@@ -19,6 +20,7 @@ export function AuthProvider({ children }) {
     const [tokens, setTokens] = useState(() => safeParse(localStorage.getItem('tokens')));
     const [loading, setLoading] = useState(false);
     const [profilePic, setProfilePic] = useState(null);
+    const navigate = useNavigate();
 
     const isAuthenticated = !!tokens?.access;
 
@@ -99,6 +101,7 @@ export function AuthProvider({ children }) {
         setTokens(null);
         setUser(null);
         setProfilePic(null);
+        navigate("/");
     };
 
     // Role checker

@@ -238,7 +238,7 @@ export default function Layout() {
                         <div className="flex items-center text-sm">
                             <span className="text-slate-400 hidden sm:inline-block">WorkForce Hub</span>
                             <span className="mx-2 text-slate-300 hidden sm:inline-block">/</span>
-                            <h2 className="font-semibold text-slate-800">
+                            <h2 className="font-semibold text-slate-800 dark:text-white">
                                 {pageTitle[currentPage] || currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}
                             </h2>
                         </div>
@@ -264,7 +264,7 @@ export default function Layout() {
                             {notifOpen && (
                                 <div className="absolute right-0 mt-2 w-96 max-h-[480px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                                     <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
-                                        <span className="text-sm font-bold text-slate-800">Notifications</span>
+                                        <span className="text-sm font-bold text-slate-800 dark:text-white">Notifications</span>
                                         <div className="flex items-center gap-3">
                                             {unreadCount > 0 && (
                                                 <button
@@ -301,7 +301,7 @@ export default function Layout() {
                                                 >
                                                     <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${!n.is_read ? 'bg-[#2563EB]' : 'bg-slate-200'}`} />
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-[13px] leading-snug ${!n.is_read ? 'font-semibold text-slate-800' : 'font-medium text-slate-600'}`}>
+                                                        <p className={`text-[13px] leading-snug ${!n.is_read ? 'font-semibold text-slate-800 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
                                                             {n.message}
                                                         </p>
                                                         <p className="text-[10px] text-slate-400 mt-1 font-medium">
@@ -351,7 +351,7 @@ export default function Layout() {
                             <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-rose-50">
                                 <LogOut className="w-8 h-8 text-rose-500" strokeWidth={2} />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Sign Out</h3>
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Sign Out</h3>
                             <p className="text-sm text-slate-500 max-w-[260px] mx-auto">
                                 Are you sure you want to log out of your WorkForce Hub account?
                             </p>
