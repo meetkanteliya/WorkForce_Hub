@@ -133,7 +133,7 @@ export default function DepartmentList() {
                                 Showing <span className="font-semibold text-slate-900 dark:text-white">{startIndex + 1}</span>–<span className="font-semibold text-slate-900 dark:text-white">{Math.min(startIndex + itemsPerPage, totalItems)}</span> of <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span> departments
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <button 
+                                <button
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                     disabled={currentPage === 1}
                                     className="px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -144,11 +144,10 @@ export default function DepartmentList() {
                                     <button
                                         key={page}
                                         onClick={() => setCurrentPage(page)}
-                                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                                            currentPage === page 
-                                                ? 'bg-[#10B981] text-white border border-[#10B981]' 
+                                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${currentPage === page
+                                                ? 'bg-[#10B981] text-white border border-[#10B981]'
                                                 : 'text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1E293B] hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'
-                                        }`}
+                                            }`}
                                     >
                                         {page}
                                     </button>
