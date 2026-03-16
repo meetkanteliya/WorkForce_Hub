@@ -20,7 +20,10 @@ export default function SalaryList() {
             const endpoint = tab === 'my' ? '/payroll/my/' : '/payroll/';
             const res = await API.get(endpoint);
             setSalaries(res.data.results ?? res.data);
-        } catch { } finally { setLoading(false); }
+        } catch (err) {
+            console.error('[SalaryList] Failed to fetch salaries', err);
+            setSalaries([]);
+        } finally { setLoading(false); }
     };
 
     useEffect(() => {

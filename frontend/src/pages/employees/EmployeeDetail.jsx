@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createElement } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -195,7 +195,7 @@ function InfoRow({ icon: Icon, label, value }) {
     return (
         <div className="flex items-start gap-4 group">
             <div className="mt-0.5 w-10 h-10 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-[#2563EB]/10 group-hover:text-[#2563EB] transition-colors border border-slate-100 group-hover:border-[#2563EB]/20 shrink-0">
-                <Icon className="w-5 h-5" />
+                {createElement(Icon, { className: "w-5 h-5" })}
             </div>
             <div className="flex-1 min-w-0 pt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>

@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from django.db import transaction
 
 from .models import LeaveType, LeaveRequest, LeaveBalance
 from .serializers import (
@@ -43,11 +44,15 @@ class LeaveRequestViewSet(ModelViewSet):
             return qs
 
         if user.role == "manager":
-            return qs.filter(
-                employee__department=user.employee.department
-            )
+            try:
+                return qs.filter(employee__department=user.employee.department)
+            except Exception:
+                return qs.none()
 
-        return qs.filter(employee=user.employee)
+        try:
+            return qs.filter(employee=user.employee)
+        except Exception:
+            return qs.none()
 
     def perform_create(self, serializer):
         try:
@@ -109,31 +114,39 @@ class LeaveRequestViewSet(ModelViewSet):
 
     @action(detail=True, methods=["patch"], permission_classes=[IsManagerOrAbove])
     def approve(self, request, pk=None):
-        leave = self.get_object()
-        if leave.status == "approved":
-            return Response({"status": "already approved"})
-
-        # Deduct balance on approval
-        days_requested = (leave.end_date - leave.start_date).days + 1
-        current_year = leave.start_date.year
-        try:
-            balance = LeaveBalance.objects.get(
-                employee=leave.employee, leave_type=leave.leave_type, year=current_year
+        with transaction.atomic():
+            leave = (
+                LeaveRequest.objects
+                .select_for_update()
+                .select_related("employee__user", "leave_type")
+                .get(pk=pk)
             )
-            available = balance.allocated_days - balance.used_days
-            if days_requested > available:
-                return Response(
-                    {"detail": f"Insufficient balance. Employee has {available} days left."},
-                    status=400,
-                )
-            balance.used_days += days_requested
-            balance.save()
-        except LeaveBalance.DoesNotExist:
-            pass
+            if leave.status == "approved":
+                return Response({"status": "already approved"})
 
-        leave.status = "approved"
-        leave.approved_by = request.user
-        leave.save()
+            days_requested = (leave.end_date - leave.start_date).days + 1
+            current_year = leave.start_date.year
+
+            try:
+                balance = (
+                    LeaveBalance.objects
+                    .select_for_update()
+                    .get(employee=leave.employee, leave_type=leave.leave_type, year=current_year)
+                )
+                available = balance.allocated_days - balance.used_days
+                if days_requested > available:
+                    return Response(
+                        {"detail": f"Insufficient balance. Employee has {available} days left."},
+                        status=400,
+                    )
+                balance.used_days += days_requested
+                balance.save()
+            except LeaveBalance.DoesNotExist:
+                pass
+
+            leave.status = "approved"
+            leave.approved_by = request.user
+            leave.save()
 
         AuditLog.objects.create(
             action_type="leave_approved",
@@ -197,7 +210,10 @@ class LeaveRequestViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], url_path="my")
     def my(self, request):
         """View own leave history."""
-        leaves = self.queryset.filter(employee=request.user.employee)
+        try:
+            leaves = self.queryset.filter(employee=request.user.employee)
+        except Exception:
+            return Response({"detail": "No employee record linked to your account."}, status=400)
         page = self.paginate_queryset(leaves)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -232,15 +248,24 @@ class LeaveBalanceViewSet(ModelViewSet):
             return queryset
 
         if user.role == "manager":
-            return queryset.filter(employee__department=user.employee.department)
+            try:
+                return queryset.filter(employee__department=user.employee.department)
+            except Exception:
+                return queryset.none()
 
-        return queryset.filter(employee=user.employee)
+        try:
+            return queryset.filter(employee=user.employee)
+        except Exception:
+            return queryset.none()
 
     @action(detail=False, methods=["get"], url_path="my")
     def my(self, request):
         """View own leave balances."""
         current_year = datetime.now().year
-        balances = self.queryset.filter(employee=request.user.employee, year=current_year)
+        try:
+            balances = self.queryset.filter(employee=request.user.employee, year=current_year)
+        except Exception:
+            return Response({"detail": "No employee record linked to your account."}, status=400)
         serializer = self.get_serializer(balances, many=True)
         return Response(serializer.data)
 

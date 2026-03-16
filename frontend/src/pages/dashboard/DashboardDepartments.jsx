@@ -19,7 +19,9 @@ export default function DashboardDepartments() {
                     const res = await API.get('/dashboard/departments/');
                     setDepartments(res.data.results ?? res.data);
                 }
-            } catch { } finally { setLoading(false); }
+            } catch (err) {
+                console.error('[DashboardDepartments] Failed to load', err);
+            } finally { setLoading(false); }
         };
         fetch();
     }, [id]);

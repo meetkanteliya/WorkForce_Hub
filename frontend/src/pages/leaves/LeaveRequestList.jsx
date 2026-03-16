@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createElement } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Link, useSearchParams } from 'react-router-dom';
@@ -50,11 +50,11 @@ export default function LeaveRequestList() {
 
     // ─── Pagination ───
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(50); // user can change it if they want, default 50 to show generally "all" at a time without hard 10 limit
+    const itemsPerPage = 50;
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter, itemsPerPage]);
+    }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter]);
 
     // ─── Fetch leave requests ───
     const fetchRequests = async (currentTab) => {
@@ -76,7 +76,10 @@ export default function LeaveRequestList() {
         try {
             const res = await API.get('/leaves/balances/');
             setBalances(res.data.results ?? res.data);
-        } catch { } finally { setBalanceLoading(false); }
+        } catch (err) {
+            console.error('[LeaveRequestList] Failed to fetch balances', err);
+            setBalances([]);
+        } finally { setBalanceLoading(false); }
     };
 
     useEffect(() => {
@@ -192,7 +195,7 @@ export default function LeaveRequestList() {
     searchFilteredBalances.forEach(b => {
         // employee_code can be empty/null, causing all such users to collapse into one row!
         // We use employee_name (or employee id if available)
-        const key = b.employee_name || b.employee_code;
+        const key = b.employee_id || b.employee_code || b.employee_name;
         if (!groupedBalances[key]) {
             groupedBalances[key] = {
                 employee_id: key,
@@ -678,7 +681,7 @@ function EmptyState({ icon: Icon, title, subtitle }) {
     return (
         <div className="glass-panel dark:bg-[#111827]/40 rounded-2xl p-12 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-700">
-                <Icon className="w-8 h-8 text-slate-400" />
+                {createElement(Icon, { className: "w-8 h-8 text-slate-400" })}
             </div>
             <h3 className="text-lg font-bold text-[#1A2B3C] dark:text-white">{title}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>

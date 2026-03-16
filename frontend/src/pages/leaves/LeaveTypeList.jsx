@@ -16,7 +16,10 @@ export default function LeaveTypeList() {
         try {
             const res = await API.get('/leaves/types/');
             setTypes(res.data.results ?? res.data);
-        } catch { } finally { setLoading(false); }
+        } catch (err) {
+            console.error('[LeaveTypeList] Failed to fetch leave types', err);
+            setTypes([]);
+        } finally { setLoading(false); }
     };
 
     useEffect(() => { fetchTypes(); }, []);

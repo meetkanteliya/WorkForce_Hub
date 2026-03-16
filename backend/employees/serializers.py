@@ -1,8 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from .models import Employee, Department
-from leaves.models import LeaveRequest
 
 User = get_user_model()
 
@@ -36,7 +34,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
     department_name = serializers.CharField(source="department.name", read_only=True, default="Unassigned")
-    is_on_leave_today = serializers.SerializerMethodField()
+    is_on_leave_today = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Employee
@@ -64,15 +62,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "is_on_leave_today",
         )
 
-    def get_is_on_leave_today(self, obj):
-        today = timezone.localtime().date()
-        return LeaveRequest.objects.filter(
-            employee=obj,
-            status="approved",
-            start_date__lte=today,
-            end_date__gte=today
-        ).exists()
-
     def create(self, validated_data):
         user_id = validated_data.pop("user_id", None)
         email = validated_data.pop("email", None)
@@ -82,28 +71,30 @@ class EmployeeSerializer(serializers.ModelSerializer):
         first_name = validated_data.pop("first_name", "")
         last_name = validated_data.pop("last_name", "")
 
-        if user_id:
-            user = User.objects.get(id=user_id)
-            if email:
-                user.email = email
+        from django.db import transaction
+        with transaction.atomic():
+            if user_id:
+                user = User.objects.select_for_update().get(id=user_id)
+                if email:
+                    user.email = email
+                    user.save()
+            else:
+                if not username or not password or not email:
+                    raise serializers.ValidationError("Username, password, and email are required to create a new user.")
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    role=role
+                )
+            if first_name is not None:
+                user.first_name = first_name
+            if last_name is not None:
+                user.last_name = last_name
+            if first_name is not None or last_name is not None:
                 user.save()
-        else:
-            if not username or not password or not email:
-                raise serializers.ValidationError("Username, password, and email are required to create a new user.")
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                role=role
-            )
-        if first_name is not None:
-            user.first_name = first_name
-        if last_name is not None:
-            user.last_name = last_name
-        if first_name is not None or last_name is not None:
-            user.save()
-            
-        return Employee.objects.create(user=user, **validated_data)
+
+            return Employee.objects.create(user=user, **validated_data)
 
     def update(self, instance, validated_data):
         email = validated_data.pop("email", None)

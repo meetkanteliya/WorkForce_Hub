@@ -71,10 +71,13 @@ export default function Layout() {
             const res = await API.get('/dashboard/notifications/');
             setNotifications(res.data.results || []);
             setUnreadCount(res.data.unread_count || 0);
-        } catch { }
+        } catch (err) {
+            console.error('[Layout] Failed to fetch notifications', err);
+        }
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 30000);
         return () => clearInterval(interval);
@@ -96,7 +99,9 @@ export default function Layout() {
             await API.patch(`/dashboard/notifications/${id}/read/`);
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
             setUnreadCount(prev => Math.max(0, prev - 1));
-        } catch { }
+        } catch (err) {
+            console.error('[Layout] Failed to mark notification read', err);
+        }
     };
 
     const markAllAsRead = async () => {
@@ -104,7 +109,9 @@ export default function Layout() {
             await API.patch('/dashboard/notifications/read-all/');
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
             setUnreadCount(0);
-        } catch { }
+        } catch (err) {
+            console.error('[Layout] Failed to mark all notifications read', err);
+        }
     };
 
     const clearAllNotifications = async () => {
@@ -112,7 +119,9 @@ export default function Layout() {
             await API.delete('/dashboard/notifications/clear-all/');
             setNotifications([]);
             setUnreadCount(0);
-        } catch { }
+        } catch (err) {
+            console.error('[Layout] Failed to clear notifications', err);
+        }
     };
 
 

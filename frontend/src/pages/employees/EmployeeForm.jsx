@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createElement } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { User, Mail, Phone, Building2, BriefcaseBusiness, Calendar, Lock, ShieldCheck, ChevronLeft } from 'lucide-react';
@@ -274,7 +274,7 @@ function InputField({ icon: Icon, label, name, type = "text", value, onChange, r
             </label>
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Icon className="w-4 h-4 text-slate-400" />
+                    {createElement(Icon, { className: "w-4 h-4 text-slate-400" })}
                 </div>
                 <input
                     type={type}

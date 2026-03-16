@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { Send, MessageSquare, Clock, Paperclip, Users } from 'lucide-react';
+import { Send, MessageSquare, Clock, Paperclip, Users, Trash2 } from 'lucide-react';
 
 function getBackendOrigin() {
   return import.meta.env.VITE_BACKEND_ORIGIN || 'http://localhost:8000';
@@ -21,9 +21,11 @@ export default function CompanyChat() {
   const [members, setMembers] = useState([]);
   const [input, setInput] = useState('');
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [socket, setSocket] = useState(null);
+  const socketRef = useRef(null);
   const [typingUsers, setTypingUsers] = useState(() => new Map());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingIds, setDeletingIds] = useState(() => new Set());
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -75,11 +77,11 @@ export default function CompanyChat() {
     const connectWebSocket = () => {
 
       const ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
 
       ws.onopen = () => {
         console.log("WebSocket connected");
         reconnectAttemptsRef.current = 0;
-        setSocket(ws);
       };
 
       ws.onmessage = (event) => {
@@ -126,6 +128,10 @@ export default function CompanyChat() {
 
         }
 
+        if (data.type === "company_message_deleted" && data.payload?.id) {
+          setMessages((prev) => prev.map((m) => (m.id === data.payload.id ? data.payload : m)));
+        }
+
       };
 
       ws.onerror = () => {
@@ -150,7 +156,7 @@ export default function CompanyChat() {
 
     return () => {
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      if (socket) socket.close();
+      if (socketRef.current) socketRef.current.close();
     };
 
   }, [tokens?.access, meId]);
@@ -161,6 +167,7 @@ export default function CompanyChat() {
 
   const sendTyping = (isTyping) => {
 
+    const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
     socket.send(JSON.stringify({
@@ -190,6 +197,7 @@ export default function CompanyChat() {
 
     const text = input.trim();
 
+    const socket = socketRef.current;
     if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
 
     socket.send(JSON.stringify({
@@ -200,6 +208,61 @@ export default function CompanyChat() {
     setInput('');
     sendTyping(false);
 
+  };
+
+  const handlePickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (file) => {
+    if (!file) return;
+    if (!tokens?.access) return;
+
+    setIsUploading(true);
+    try {
+      const form = new FormData();
+      form.append("attachment", file);
+      form.append("content", input.trim());
+      await API.post("/chat/company/messages/", form);
+      setInput("");
+      sendTyping(false);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const canDelete = (msg) => {
+    const senderId = msg?.sender?.id;
+    return senderId && (senderId === meId || user?.role === 'admin' || user?.role === 'hr');
+  };
+
+  const handleDeleteMessage = async (msg) => {
+    if (!msg?.id) return;
+    if (!canDelete(msg)) return;
+
+    const id = msg.id;
+    const snapshot = messages;
+
+    setDeletingIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, is_deleted: true } : m)));
+
+    try {
+      await API.delete(`/chat/company/messages/${id}/delete/`);
+    } catch {
+      setMessages(snapshot);
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   return (
@@ -252,6 +315,8 @@ export default function CompanyChat() {
 
               const sender = msg.sender || {};
               const isMe = sender.id === meId;
+              const isDeleted = !!msg.is_deleted;
+              const deleting = deletingIds.has(msg.id);
 
               const pic = sender.profile_picture
                 ? `${getBackendOrigin()}${sender.profile_picture}`
@@ -265,9 +330,39 @@ export default function CompanyChat() {
                     <img src={pic} className="w-8 h-8 rounded-full object-cover" />
                   )}
 
-                  <div className={`px-4 py-2 rounded-xl text-sm ${isMe ? 'bg-emerald-600 text-white' : 'bg-white border'}`}>
+                  <div className={`px-4 py-2 rounded-xl text-sm relative ${isMe ? 'bg-emerald-600 text-white' : 'bg-white border'}`}>
 
-                    {msg.content}
+                    <div className="pr-10">
+                      {isDeleted ? (
+                        <span className="italic opacity-80">Message deleted</span>
+                      ) : (
+                        msg.content
+                      )}
+                      {!!msg.attachment_url && (
+                        <div className="mt-2">
+                          <a
+                            className={`${isMe ? 'text-white underline' : 'text-emerald-700 underline'}`}
+                            href={`${getBackendOrigin()}${msg.attachment_url}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {msg.attachment_name || 'Attachment'}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {canDelete(msg) && !isDeleted && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(msg)}
+                        disabled={deleting}
+                        className={`absolute top-2 right-2 p-1 rounded ${isMe ? 'hover:bg-white/10' : 'hover:bg-slate-50'} disabled:opacity-50`}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <div className="text-[10px] opacity-70 mt-1 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -290,15 +385,29 @@ export default function CompanyChat() {
 
         </div>
 
+        {typingUsers.size > 0 && (
+          <div className="px-6 py-2 text-xs text-slate-500 bg-white border-t">
+            {Array.from(typingUsers.values()).slice(0, 3).join(', ')} typing...
+          </div>
+        )}
+
         <div className="p-4 border-t flex gap-2">
 
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handlePickFile}
+            disabled={isUploading}
             className="p-3 rounded-xl border"
           >
             <Paperclip className="w-5 h-5" />
           </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => handleFileSelected(e.target.files?.[0])}
+          />
 
           <input
             type="text"
@@ -310,7 +419,8 @@ export default function CompanyChat() {
 
           <button
             onClick={handleSend}
-            className="p-3 bg-emerald-600 text-white rounded-xl"
+            disabled={isUploading}
+            className="p-3 bg-emerald-600 text-white rounded-xl disabled:opacity-60"
           >
             <Send className="w-5 h-5" />
           </button>

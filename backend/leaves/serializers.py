@@ -35,6 +35,7 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
 
 class LeaveBalanceSerializer(serializers.ModelSerializer):
     leave_type = LeaveTypeSerializer(read_only=True)
+    employee_id = serializers.IntegerField(source="employee.id", read_only=True)
     employee_name = serializers.CharField(source="employee.user.username", read_only=True)
     employee_code = serializers.CharField(source="employee.employee_code", read_only=True)
     department_name = serializers.CharField(source="employee.department.name", read_only=True, default="Unassigned")
@@ -45,6 +46,7 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
         model = LeaveBalance
         fields = (
             "id",
+            "employee_id",
             "employee_name",
             "employee_code",
             "department_name",

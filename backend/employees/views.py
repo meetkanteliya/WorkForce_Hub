@@ -8,6 +8,9 @@ from .models import Employee, Department
 from .serializers import EmployeeSerializer, DepartmentSerializer
 from accounts.permissions import IsAdmin, IsAdminOrHR
 from dashboard.models import AuditLog, Notification
+from django.utils import timezone
+from django.db.models import Exists, OuterRef, Q
+from leaves.models import LeaveRequest
 
 
 class DepartmentViewSet(ModelViewSet):
@@ -20,15 +23,22 @@ class EmployeeViewSet(ModelViewSet):
     queryset = Employee.objects.select_related("user", "department")
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = None  # Return all records
 
     def get_queryset(self):
         user = self.request.user
         qs = self.queryset.all()
 
+        today = timezone.localdate()
+        on_leave_qs = LeaveRequest.objects.filter(
+            employee_id=OuterRef("pk"),
+            status="approved",
+            start_date__lte=today,
+            end_date__gte=today,
+        )
+        qs = qs.annotate(is_on_leave_today=Exists(on_leave_qs))
+
         search_query = self.request.query_params.get('search', None)
         if search_query:
-            from django.db.models import Q
             qs = qs.filter(
                 Q(user__username__icontains=search_query) |
                 Q(department__name__icontains=search_query) |
@@ -37,11 +47,45 @@ class EmployeeViewSet(ModelViewSet):
                 Q(user__email__icontains=search_query)
             ).distinct()
 
+        department = (self.request.query_params.get("department") or "").strip()
+        if department:
+            if department.isdigit():
+                qs = qs.filter(department_id=int(department))
+            else:
+                qs = qs.filter(department__name__iexact=department)
+
+        role = (self.request.query_params.get("role") or "").strip()
+        if role:
+            qs = qs.filter(user__role__iexact=role)
+
+        designation = (self.request.query_params.get("designation") or "").strip()
+        if designation:
+            qs = qs.filter(designation__icontains=designation)
+
+        date_from = (self.request.query_params.get("date_from") or "").strip()
+        if date_from:
+            qs = qs.filter(date_of_joining__gte=date_from)
+
+        date_to = (self.request.query_params.get("date_to") or "").strip()
+        if date_to:
+            qs = qs.filter(date_of_joining__lte=date_to)
+
+        status = (self.request.query_params.get("status") or "").strip().lower()
+        if status == "active":
+            qs = qs.filter(user__is_active=True)
+        elif status == "inactive":
+            qs = qs.filter(user__is_active=False)
+        elif status == "present":
+            qs = qs.filter(user__is_active=True).filter(is_on_leave_today=False)
+
         if user.role in ["admin", "hr"]:
             return qs
 
         if user.role == "manager":
-            return qs.filter(department=user.employee.department)
+            try:
+                return qs.filter(department=user.employee.department)
+            except Exception:
+                return qs.none()
 
         return qs.filter(user=user)
 

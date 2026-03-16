@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createElement } from 'react';
 import { createPortal } from 'react-dom';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -26,9 +26,8 @@ import {
 } from 'lucide-react';
 
 export default function Profile() {
-    const { user, login, setProfilePic } = useAuth();
+    const { user, setProfilePic } = useAuth();
     const [employee, setEmployee] = useState(null);
-    const [salarySummary, setSalarySummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
@@ -42,7 +41,7 @@ export default function Profile() {
 
     const fetchProfileData = async () => {
         try {
-            const [empRes, payrollRes] = await Promise.all([
+            const [empRes] = await Promise.all([
                 API.get('/employees/me/'),
                 API.get('/payroll/my/').catch(() => ({ data: [] }))
             ]);
@@ -54,11 +53,7 @@ export default function Profile() {
                 last_name: empRes.data?.user?.last_name || '',
             });
 
-            const payslips = payrollRes.data;
-            if (payslips && payslips.length > 0) {
-                // Get most recent payslip
-                setSalarySummary(payslips[0]);
-            }
+            // Payroll endpoint is fetched for future UI; ignore when unused.
         } catch (err) {
             console.error("Failed to fetch profile data", err);
         } finally {
@@ -528,7 +523,7 @@ function InfoField({ icon: Icon, label, name, value, type = "text", onChange, is
     return (
         <div className="flex items-center gap-4">
             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-slate-800/40 border border-slate-700/50 text-slate-400">
-                <Icon className="w-4 h-4" />
+                {createElement(Icon, { className: "w-4 h-4" })}
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-semibold text-slate-500 mb-0.5">{label}</p>

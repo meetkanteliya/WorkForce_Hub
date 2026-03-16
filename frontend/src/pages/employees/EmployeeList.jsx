@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, createElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
@@ -26,11 +26,7 @@ export default function EmployeeList() {
 
     const [search, setSearch] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('');
-    const [roleFilter, setRoleFilter] = useState('');
-    const [designationFilter, setDesignationFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
 
     const [loading, setLoading] = useState(true);
     const [employeeToDelete, setEmployeeToDelete] = useState(null);
@@ -46,18 +42,14 @@ export default function EmployeeList() {
         previous: null
     });
 
-    const fetchEmployees = async () => {
+    const fetchEmployees = useCallback(async () => {
         setLoading(true);
         try {
             const params = {
                 page,
                 search: search || undefined,
                 department: departmentFilter || undefined,
-                role: roleFilter || undefined,
-                designation: designationFilter || undefined,
                 status: statusFilter || undefined,
-                date_from: dateFrom || undefined,
-                date_to: dateTo || undefined
             };
             const res = await API.get('/employees/', { params });
             const results = res.data?.results ?? res.data;
@@ -69,10 +61,12 @@ export default function EmployeeList() {
             });
         } catch (err) {
             console.error('Failed to fetch employees:', err);
+            setEmployees([]);
+            setMeta({ count: 0, next: null, previous: null });
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, search, departmentFilter, statusFilter]);
 
     const fetchDepartments = async () => {
         try {
@@ -85,7 +79,7 @@ export default function EmployeeList() {
 
     useEffect(() => {
         fetchEmployees();
-    }, [page, search, departmentFilter, roleFilter, designationFilter, statusFilter, dateFrom, dateTo]);
+    }, [fetchEmployees]);
 
     useEffect(() => {
         fetchDepartments();
@@ -172,6 +166,7 @@ export default function EmployeeList() {
                         >
                             <option value="">All Status</option>
                             <option value="active">Active</option>
+                            <option value="present">Present</option>
                             <option value="inactive">Inactive</option>
                         </select>
                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -342,7 +337,7 @@ function EmptyState({ icon: Icon, title, subtitle }) {
     return (
         <div className="glass-panel dark:bg-[#111827]/40 rounded-2xl p-12 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-700">
-                <Icon className="w-8 h-8 text-slate-400" />
+                {createElement(Icon, { className: "w-8 h-8 text-slate-400" })}
             </div>
             <h3 className="text-lg font-bold text-[#1A2B3C] dark:text-white">{title}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{subtitle}</p>

@@ -7,8 +7,9 @@ from .models import ChatMessage, CompanyChatMessage
 from employees.models import Department
 from accounts.models import User
 import urllib.parse
-import jwt
 from django.conf import settings
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
 # Setup simple file logging for debugging
 logger = logging.getLogger("chat_debug")
@@ -76,6 +77,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not await self.is_user_active(self.user.id):
                 await self.close()
                 return
+            if not await self.check_department_access(self.user, self.department_id):
+                await self.close()
+                return
             # Save to DB
             chat_message = await self.save_message(self.user.id, self.department_id, message)
             
@@ -102,10 +106,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_user_from_token(self, token):
         if not token: return None
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            return User.objects.get(id=payload['user_id'])
+            access = AccessToken(token)
+            user_id = access.get("user_id")
+            if not user_id:
+                return None
+            return User.objects.get(id=user_id)
+        except (TokenError, InvalidToken) as e:
+            logger.debug(f"JWT validation error: {e}")
+            return None
         except Exception as e:
-            logger.debug(f"JWT decode error: {e}")
+            logger.debug(f"JWT lookup error: {e}")
             return None
 
     @database_sync_to_async
@@ -237,31 +247,54 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def company_chat_message(self, event):
-        await self.send(text_data=json.dumps({"type": "message", **event}))
+        payload = event.get("payload")
+        await self.send(text_data=json.dumps({"type": "company_chat_message", "payload": payload}))
 
     async def company_typing(self, event):
-        await self.send(text_data=json.dumps({"type": "typing", **event}))
+        await self.send(text_data=json.dumps({
+            "type": "company_typing",
+            "user_id": event.get("user_id"),
+            "full_name": event.get("full_name"),
+            "is_typing": event.get("is_typing"),
+        }))
 
     async def company_presence(self, event):
-        await self.send(text_data=json.dumps({"type": "presence", **event}))
+        await self.send(text_data=json.dumps({
+            "type": "company_presence",
+            "event": event.get("event"),
+            "user_id": event.get("user_id"),
+            "full_name": event.get("full_name"),
+        }))
 
     async def employee_event(self, event):
         await self.send(text_data=json.dumps({"type": "employee", **event}))
 
     async def company_message_deleted(self, event):
-        await self.send(text_data=json.dumps({"type": "deleted", **event}))
+        await self.send(text_data=json.dumps({
+            "type": "company_message_deleted",
+            "payload": event.get("payload"),
+        }))
 
     async def company_read_receipt(self, event):
-        await self.send(text_data=json.dumps({"type": "read", **event}))
+        await self.send(text_data=json.dumps({
+            "type": "company_read_receipt",
+            "payload": event.get("payload"),
+        }))
 
     @database_sync_to_async
     def get_user_from_token(self, token):
         if not token: return None
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            return User.objects.get(id=payload['user_id'])
+            access = AccessToken(token)
+            user_id = access.get("user_id")
+            if not user_id:
+                return None
+            return User.objects.get(id=user_id)
+        except (TokenError, InvalidToken) as e:
+            logger.debug(f"JWT validation error: {e}")
+            return None
         except Exception as e:
-            logger.debug(f"JWT decode error: {e}")
+            logger.debug(f"JWT lookup error: {e}")
             return None
 
     @database_sync_to_async

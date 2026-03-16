@@ -69,7 +69,7 @@ API.interceptors.response.use(
 
                     return API(originalRequest);
 
-                } catch (refreshError) {
+                } catch {
                     localStorage.removeItem('tokens');
                     localStorage.removeItem('user');
                     window.location.href = '/login';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, createElement } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
@@ -303,13 +303,13 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
                                     {(data.recently_added_employees || []).slice(0, 4).map((emp) => (
                                         <div key={emp.id} className="flex items-center gap-3">
                                             <img
-                                                src={emp.profile_picture ? `/media/${emp.profile_picture}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user__username)}&size=56&background=F1F5F9&color=64748B&bold=true&font-size=0.45`}
-                                                alt={emp.user__username}
+                                                src={emp.profile_picture ? `/media/${emp.profile_picture}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user__username || emp.username || 'User')}&size=56&background=F1F5F9&color=64748B&bold=true&font-size=0.45`}
+                                                alt={emp.user__username || emp.username || 'User'}
                                                 className="w-7 h-7 rounded-full object-cover bg-slate-100 shrink-0"
                                             />
                                             <div>
-                                                <p className="text-xs font-semibold text-[#1A2B3C]">{emp.user__username}</p>
-                                                <p className="text-[9px] text-slate-400 uppercase tracking-wider">{emp.department__name || 'Unassigned'}</p>
+                                                <p className="text-xs font-semibold text-[#1A2B3C]">{emp.user__username || emp.username || '—'}</p>
+                                                <p className="text-[9px] text-slate-400 uppercase tracking-wider">{emp.department__name || emp.department_name || 'Unassigned'}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -652,7 +652,7 @@ function KPICard({ label, value, icon: IconComponent, color = "text-[#1A2B3C]", 
         >
             <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
-                <IconComponent className="w-4 h-4 text-slate-300" />
+                {createElement(IconComponent, { className: "w-4 h-4 text-slate-300" })}
             </div>
             <span className={`text-2xl font-black tracking-tight ${color}`}>{value ?? 0}</span>
         </div>
@@ -671,7 +671,7 @@ function MetricRow({ label, value, highlight }) {
 function QuickActionLink({ to, icon: IconComponent, label }) {
     return (
         <Link to={to} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-colors group">
-            <IconComponent className="w-4 h-4 text-slate-400 group-hover:text-white" />
+            {createElement(IconComponent, { className: "w-4 h-4 text-slate-400 group-hover:text-white" })}
             <span className="text-sm font-medium text-slate-200 group-hover:text-white">{label}</span>
         </Link>
     );
