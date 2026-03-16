@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
@@ -33,57 +34,59 @@ export default function App() {
         <ThemeProvider>
           <Routes>
             {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
 
             {/* Protected Routes */}
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="chat" element={<CompanyChat />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="change-password" element={<ChangePassword />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/chat" element={<CompanyChat />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/change-password" element={<ChangePassword />} />
 
               {/* Departments */}
-              <Route path="departments" element={<ProtectedRoute roles={['admin', 'hr']}><DepartmentList /></ProtectedRoute>} />
-              <Route path="departments/new" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
-              <Route path="departments/:id/edit" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
+              <Route path="/departments" element={<ProtectedRoute roles={['admin', 'hr']}><DepartmentList /></ProtectedRoute>} />
+              <Route path="/departments/new" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
+              <Route path="/departments/:id/edit" element={<ProtectedRoute roles={['admin']}><DepartmentForm /></ProtectedRoute>} />
 
               {/* Employees */}
-              <Route path="employees" element={<ProtectedRoute roles={['admin', 'hr', 'manager']}><EmployeeList /></ProtectedRoute>} />
-              <Route path="employees/new" element={<ProtectedRoute roles={['admin', 'hr']}><EmployeeForm /></ProtectedRoute>} />
-              <Route path="employees/:id" element={<EmployeeDetail />} />
-              <Route path="employees/:id/edit" element={<ProtectedRoute roles={['admin', 'hr']}><EmployeeForm /></ProtectedRoute>} />
+              <Route path="/employees" element={<ProtectedRoute roles={['admin', 'hr', 'manager']}><EmployeeList /></ProtectedRoute>} />
+              <Route path="/employees/new" element={<ProtectedRoute roles={['admin', 'hr']}><EmployeeForm /></ProtectedRoute>} />
+              <Route path="/employees/:id" element={<EmployeeDetail />} />
+              <Route path="/employees/:id/edit" element={<ProtectedRoute roles={['admin', 'hr']}><EmployeeForm /></ProtectedRoute>} />
 
               {/* Leaves */}
-              <Route path="leaves" element={<LeaveRequestList />} />
-              <Route path="leaves/types" element={<LeaveTypeList />} />
-              <Route path="leaves/apply" element={<LeaveRequestForm />} />
+              <Route path="/leaves" element={<LeaveRequestList />} />
+              <Route path="/leaves/types" element={<LeaveTypeList />} />
+              <Route path="/leaves/apply" element={<LeaveRequestForm />} />
 
               {/* Payroll */}
-              <Route path="payroll" element={<ProtectedRoute roles={['admin', 'hr']}><SalaryList /></ProtectedRoute>} />
-              <Route path="payroll/new" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
-              <Route path="payroll/:id/edit" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
-              <Route path="my-salary" element={<ProtectedRoute roles={['employee', 'hr', 'manager']}><MySalary /></ProtectedRoute>} />
+              <Route path="/payroll" element={<ProtectedRoute roles={['admin', 'hr']}><SalaryList /></ProtectedRoute>} />
+              <Route path="/payroll/new" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
+              <Route path="/payroll/:id/edit" element={<ProtectedRoute roles={['admin']}><SalaryForm /></ProtectedRoute>} />
+              <Route path="/my-salary" element={<ProtectedRoute roles={['employee', 'hr', 'manager']}><MySalary /></ProtectedRoute>} />
 
               {/* Dashboard Drill-down Pages (Admin & HR) */}
-              <Route path="dashboard/employees" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardEmployees /></ProtectedRoute>} />
-              <Route path="dashboard/departments" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
-              <Route path="dashboard/departments/:id" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
-              <Route path="dashboard/leaves-pending" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeavesPending /></ProtectedRoute>} />
-              <Route path="dashboard/leave-overview" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeaveOverview /></ProtectedRoute>} />
-              <Route path="dashboard/payroll" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardPayroll /></ProtectedRoute>} />
-              <Route path="dashboard/activity" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardActivity /></ProtectedRoute>} />
+              <Route path="/dashboard/employees" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardEmployees /></ProtectedRoute>} />
+              <Route path="/dashboard/departments" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
+              <Route path="/dashboard/departments/:id" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardDepartments /></ProtectedRoute>} />
+              <Route path="/dashboard/leaves-pending" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeavesPending /></ProtectedRoute>} />
+              <Route path="/dashboard/leave-overview" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardLeaveOverview /></ProtectedRoute>} />
+              <Route path="/dashboard/payroll" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardPayroll /></ProtectedRoute>} />
+              <Route path="/dashboard/activity" element={<ProtectedRoute roles={['admin', 'hr']}><DashboardActivity /></ProtectedRoute>} />
             </Route>
 
+            {/* Back-compat: old protected root redirects */}
+            <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+
             {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ThemeProvider>
       </AuthProvider>
