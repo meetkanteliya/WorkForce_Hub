@@ -99,34 +99,40 @@ export default function LandingPage() {
   const featureCards = useMemo(
     () => [
       {
-        icon: UserCog,
-        title: 'Organization & Employee Management',
+        icon: ShieldCheck,
+        title: 'Authentication & Roles',
         description:
-          'Role-based access (Admin, HR, Manager, Employee), dynamic employee profiles, and a clean department structure.',
+          'JWT login with token refresh, plus role-based permissions for Admin, HR, Manager, and Employee access.',
+      },
+      {
+        icon: UserCog,
+        title: 'Employees & Departments',
+        description:
+          'Employee and department management, with self-profile (“me”) endpoints and server-side list filtering.',
       },
       {
         icon: MessagesSquare,
-        title: 'Real-Time Communication',
+        title: 'Chat (REST + WebSockets)',
         description:
-          'Company-wide chat, department channels, file sharing, and presence indicators for faster coordination.',
+          'Company-wide chat with typing, presence, attachments, soft delete broadcasts, and read receipts. Department chat WebSocket consumer + REST history endpoint also exist.',
       },
       {
         icon: CalendarCheck2,
         title: 'Advanced Leave Management',
         description:
-          'Leave requests (Sick, Casual, Paid), automated leave balance tracking, and approval workflows.',
+          'Leave types, leave requests, leave balances, and manager/admin/hr approve/reject actions with atomic balance deduction.',
       },
       {
         icon: WalletCards,
-        title: 'Payroll & Salary Management',
+        title: 'Payroll',
         description:
-          'Automated salary slips, net salary calculations, and pay history downloads for employees.',
+          'Salary records with computed net salary, plus role-filtered access and a “My Salary” endpoint for employees.',
       },
       {
         icon: Activity,
-        title: 'Dashboard & Monitoring',
+        title: 'Dashboards, Audit Logs & Notifications',
         description:
-          'Audit logs, global notifications, and activity tracking to keep your organization aligned.',
+          'Admin/HR dashboard summary + drill-down endpoints, audit log activity feed, and in-app notifications with mark-read and clear-all actions.',
       },
     ],
     []
@@ -135,29 +141,29 @@ export default function LandingPage() {
   const benefits = useMemo(
     () => [
       {
-        title: 'Boosted productivity',
+        title: 'JWT-secured access',
         description:
-          'Standardize HR operations and reduce manual handoffs with a unified workflow.',
+          'DRF endpoints are protected by JWT authentication with access + refresh tokens.',
       },
       {
-        title: 'Enhanced collaboration',
+        title: 'Role-based permissions',
         description:
-          'Real-time messaging and structured departments keep teams connected and focused.',
+          'Admin-only, Admin/HR, and Manager-or-above permissions are enforced across core modules.',
       },
       {
-        title: 'Data integrity and security',
+        title: 'Traceable operations',
         description:
-          'Role-based access and JWT-secured APIs help protect sensitive employee information.',
+          'Key actions generate audit log entries and employee-facing notifications for visibility.',
       },
       {
-        title: 'Improved employee experience',
+        title: 'Self-service profile updates',
         description:
-          'Self-service leave, profile updates, and transparent payroll history reduce HR friction.',
+          'Employees can view their profile and update fields (including profile picture via multipart).',
       },
       {
-        title: 'Scalable architecture',
+        title: 'Real-time collaboration',
         description:
-          'Built to grow with your workforce while maintaining responsive UX and backend performance.',
+          'Company chat is delivered via WebSockets (Channels), with an optional Redis channel layer for production-style setups.',
       },
     ],
     []

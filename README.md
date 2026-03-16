@@ -1,106 +1,207 @@
-# WorkForce Hub 🚀
+# WorkForce Hub
 
-**WorkForce Hub** is a modern, all-in-one Human Resource Management System (HRMS) and Collaboration Platform designed to streamline organizational workflows. From real-time communication to automated payroll and leave management, it empowers employees and management with a centralized, role-based dashboard.
+WorkForce Hub is a full-stack HR management app with role-based access, employee & department management, leave workflows, payroll records, dashboards, in-app notifications, and real-time chat (WebSockets via Django Channels).
 
----
+This README is generated **from the actual implemented code** in this repository (no assumed features).
 
-## 🌟 Key Features
+## Project Overview
 
-### 🏢 Organization & Employee Management
-- **Role-Based Access**: Specialized interfaces for Admin, HR, Manager, and Employee roles.
-- **Dynamic Profiles**: Manage employee data, designations, and department affiliations with ease.
-- **Departmental Structure**: Organize your workforce into logical units for better management.
+- **Frontend**: React (Vite) + Tailwind CSS
+- **Backend**: Django + Django REST Framework (DRF)
+- **Realtime**: Django Channels (WebSockets) with optional Redis channel layer
+- **Auth**: SimpleJWT (access + refresh tokens)
 
-### 💬 Real-Time Communication
-- **Company-Wide Chat**: A unified channel for organization-wide announcements and discussions.
-- **Departmental Channels**: Private, real-time chat spaces for specific teams.
-- **Interactive Messaging**: Includes typing indicators, presence tracking (join/leave), and file sharing.
+## Key Features (implemented)
 
-### 📅 Advanced Leave Management
-- **Seamless Requests**: Employees can request various leave types (Sick, Casual, Paid, etc.) directly.
-- **Automated Balances**: Real-time tracking of allocated vs. used leave days.
-- **Approval Workflow**: Managers and HR can review, approve, or reject requests with instant notifications.
+### Authentication & Roles
+- **JWT login** and token refresh (`/api/auth/login/`, `/api/auth/token/refresh/`)
+- **Current user profile** (`/api/auth/profile/`)
+- **Change password** (`/api/auth/change-password/`)
+- **Admin/HR reset password** (`/api/auth/admin-reset-password/`)
+- **Roles stored on user model**: `admin`, `hr`, `manager`, `employee`
+- **Role-based permissions** used on key endpoints (admin-only, admin/hr, manager-or-above)
 
-### 💰 Payroll & Salary Management
-- **Automated Slip Generation**: Monthly salary slips based on basic pay, bonuses, and deductions.
-- **Net Salary Calculation**: Accurate, automated math for payroll processing.
-- **Pay History**: Secure access for employees to view and download their past salary records.
+### Employees & Departments
+- **Employees CRUD** with role restrictions (admin/hr manage; admin delete)
+- **Employee “me” endpoints**:
+  - `GET /api/employees/me/`
+  - `PATCH /api/employees/me/update/` (supports multipart for profile picture)
+- **Departments CRUD** (admin-only)
+- **Employee list filters** (server-side) including `search`, `department`, `status` (`active`, `inactive`, `present`)
 
-### 📊 Dashboard & Monitoring
-- **Audit Logs**: Transparent tracking of critical actions (profile updates, leave approvals, salary payments).
-- **Global Notifications**: Stay updated with real-time alerts for messages, approvals, and system updates.
+### Leave Management
+- **Leave types** CRUD (admin/hr create/update/delete)
+- **Leave requests**
+  - Employees create requests (validated against leave balance)
+  - Managers/admin/hr can approve/reject (approval deducts balance; atomic update)
+  - “My leave history” endpoint: `GET /api/leaves/requests/my/`
+- **Leave balances**
+  - Admin/hr view and adjust balances (`/api/leaves/balances/<id>/adjust/`)
+  - “My balances” endpoint: `GET /api/leaves/balances/my/`
+  - Extra leave cap enforcement exists in serializer validation
+- **Backfill command** exists: `python manage.py backfill_leave_balances`
 
----
+### Payroll
+- **Salary records** with computed `net_salary = basic + bonus - deductions`
+- **Role filtering**:
+  - Admin/hr: all records
+  - Manager: department salaries
+  - Employee: own salaries
+- **My salary** endpoint: `GET /api/payroll/my/`
+- Salary create/update logs to audit + notifies employees
 
-## 💎 Project Benefits
+### Dashboards, Audit Logs, Notifications
+- **Dashboard summary**: `GET /api/dashboard/summary/` (admin/hr only)
+- **Dashboard drill-down endpoints**:
+  - Employees list: `GET /api/dashboard/employees/`
+  - Departments list/detail: `GET /api/dashboard/departments/`, `GET /api/dashboard/departments/<id>/`
+  - Pending leaves: `GET /api/dashboard/leaves/pending/`
+  - Leave overview: `GET /api/dashboard/leaves/overview/`
+  - Payroll overview: `GET /api/dashboard/payroll/overview/`
+  - Activity feed (audit log): `GET /api/dashboard/activity/`
+- **Notifications** (in-app):
+  - List: `GET /api/dashboard/notifications/`
+  - Mark read: `PATCH /api/dashboard/notifications/<id>/read/`
+  - Mark all read: `PATCH /api/dashboard/notifications/read-all/`
+  - Clear all: `DELETE /api/dashboard/notifications/clear-all/`
 
-- **Boosted Productivity**: Eliminates administrative bottlenecks by automating repetitive tasks like leave tracking and payroll.
-- **Enhanced Collaboration**: Integrated chat tools keep teams connected without switching between external apps.
-- **Data Integrity & Security**: Role-based permissions and audit logging ensure that sensitive information is only accessible by authorized personnel.
-- **Improved Employee Experience**: Self-service portals allow employees to manage their own profiles, leaves, and payroll records independently.
-- **Scalability**: Designed with a modular architecture (Django + React) to grow alongside your organization.
+### Chat (REST + WebSockets)
 
----
+**Company-wide chat**
+- REST:
+  - Members: `GET /api/chat/company/members/`
+  - Messages list/create (supports attachments): `GET|POST /api/chat/company/messages/`
+  - Delete (soft delete + broadcast): `DELETE /api/chat/company/messages/<id>/`
+  - Mark read: `POST /api/chat/company/messages/mark-read/`
+- WebSocket: `ws://<host>:8000/ws/company-chat/?token=<access>`
+  - Events implemented: typing, join/leave presence, message broadcast, deletion broadcast, read receipts
 
-## 🛠️ Technology Stack
+**Department chat**
+- WebSocket consumer exists: `ws://<host>:8000/ws/chat/<department_id>/?token=<access>`
+- REST history exists: `GET /api/chat/messages/?department=<id>`
+- Note: a `frontend/src/pages/chat/DepartmentChat.jsx` UI exists, but is **not currently routed** in the app router.
+
+## Core Modules
+
+- **accounts**: custom user model (`role`), profile/password endpoints, role permissions
+- **employees**: employees + departments, employee self-profile update
+- **leaves**: leave types, leave balances, leave requests + approval actions
+- **payroll**: salary records and calculations
+- **dashboard**: audit log, notifications, admin/hr dashboards + summaries
+- **chat**: department chat + company chat (REST + consumers)
+
+## Technology Stack (from repo)
 
 ### Backend
-- **Core**: Django 5.0
-- **API**: Django REST Framework (DRF)
-- **Real-Time**: Django Channels (WebSockets) + Redis
-- **Auth**: Simple JWT (JSON Web Tokens)
-- **Documentation**: drf-spectacular (Swagger/ReDoc)
+- Django 5.0.x
+- Django REST Framework
+- SimpleJWT
+- Django Channels + Daphne
+- `channels_redis` (optional, via Redis)
+- drf-spectacular (OpenAPI + Swagger/ReDoc)
+- SQLite (default dev DB)
 
 ### Frontend
-- **Framework**: React 19 + Vite
-- **Styling**: Tailwind CSS 4.0
-- **Routing**: React Router 7
-- **Icons**: Lucide React & React Icons
+- React 19 + Vite
+- Tailwind CSS (via `@tailwindcss/vite`)
+- React Router
+- Axios
+- Lucide icons + React Icons
 
----
-
-## ⚙️ Getting Started
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- Redis (for WebSockets)
-
-### Backend Setup
-1. Navigate to the `backend` directory.
-2. Create and activate a virtual environment.
-3. Install dependencies: `pip install -r requirements.txt`.
-4. Setup environment variables in a `.env` file.
-5. Run migrations: `python manage.py migrate`.
-6. Start the server: `python manage.py runserver`.
-
-### Frontend Setup
-1. Navigate to the `frontend` directory.
-2. Install dependencies: `npm install`.
-3. Start the development server: `npm run dev`.
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```text
 WorkForce_Hub/
-├── backend/            # Django project and apps
-│   ├── accounts/       # Authentication & User models
-│   ├── employees/      # Employee & Department logic
-│   ├── chat/           # WebSocket consumers & messaging
-│   ├── leaves/         # Leave balance & request management
-│   ├── payroll/        # Salary and payroll processing
-│   └── dashboard/      # Audit logs and global notifications
-├── frontend/           # React application
+├── backend/
+│   ├── accounts/        # User + auth/profile/password + permissions
+│   ├── employees/       # Employee + Department + "me" endpoints
+│   ├── leaves/          # Leave types, requests, balances + actions
+│   ├── payroll/         # Salary records (net salary computed)
+│   ├── dashboard/       # Summary endpoints, audit log, notifications
+│   ├── chat/            # REST chat endpoints + WebSocket consumers
+│   └── config/          # Django settings/urls/asgi
+├── frontend/
 │   ├── src/
-│   │   ├── components/ # Reusable UI components
-│   │   ├── pages/      # Full-page views
-│   │   ├── context/    # Global state (Auth, Notification)
-│   │   └── api/        # Axios configurations
-└── docker-compose.yml  # Docker orchestration (optional)
+│   │   ├── api/         # Axios instance + token refresh interceptor
+│   │   ├── components/  # Layout, ProtectedRoute, modals, etc.
+│   │   ├── context/     # Auth + Theme contexts
+│   │   └── pages/       # Landing, Login, Dashboard, CRUD pages, Chat
+│   └── vite.config.js   # Dev proxy to backend (/api, /media)
+├── docker-compose.yml   # Redis (optional channel layer)
+└── requirements.txt     # Python dependencies
 ```
 
----
+## Installation Instructions
 
-*WorkForce Hub – Efficiency, Transparency, and Connectivity.*
+### Prerequisites
+- Python 3.10+ (repo currently runs on modern Python; Django 5)
+- Node.js 18+
+- (Optional) Docker for Redis, if you want Redis-backed WebSockets
+
+### Backend Setup (Django)
+
+```bash
+cd backend
+python -m venv .venv
+# activate venv (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+pip install -r ../requirements.txt
+python manage.py migrate
+python manage.py runserver 8000
+```
+
+#### Environment variables
+Backend uses `python-decouple` and reads from environment:
+- `SECRET_KEY` (default: `django-insecure-change-this`)
+- `DEBUG` (default: `True`)
+- `ALLOWED_HOSTS` (default: `127.0.0.1,localhost`)
+- `CHANNEL_LAYER_BACKEND` (default: `inmemory`; set to `redis` to use Redis)
+- `REDIS_URL` (default: `redis://127.0.0.1:6379/0`)
+
+### Frontend Setup (React)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite proxies:
+- `/api` → `http://127.0.0.1:8000`
+- `/media` → `http://127.0.0.1:8000`
+
+## Real-Time Features
+
+WorkForce Hub uses Django Channels consumers:
+
+- **Company chat**: `ws://<host>:8000/ws/company-chat/?token=<access>`
+- **Department chat**: `ws://<host>:8000/ws/chat/<department_id>/?token=<access>`
+
+To use Redis channel layer (optional), start Redis and set:
+
+```bash
+docker compose up -d
+set CHANNEL_LAYER_BACKEND=redis
+set REDIS_URL=redis://127.0.0.1:6379/0
+```
+
+## Security Features
+
+- **JWT authentication** enforced by DRF default settings.
+- **Role-based permissions** (`IsAdmin`, `IsAdminOrHR`, `IsManagerOrAbove`, etc.).
+- Sensitive operations (e.g., salary create/update/delete, department CRUD) are restricted by role.
+- Audit log records key system actions (leave requests/approvals, salary actions, employee creation, profile updates).
+
+## API Documentation
+
+When the backend is running:
+- OpenAPI schema: `/api/schema/`
+- Swagger UI: `/api/docs/`
+- ReDoc: `/api/redoc/`
+
+## Future Improvements (optional)
+
+These are *not* fully implemented across the repo and are listed as potential enhancements:
+- Route and ship the existing department chat UI (`DepartmentChat.jsx`) in the main navigation.
+- Add automated creation of leave balance records for all employees when new leave types are created.
+- Add stronger production settings (CORS tightening, secure cookie options if needed, production channel layer config).
