@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+
+# Virtual env
+venv/
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+
+# Build / cache
+*.egg-info/
+build/
+dist/
+
+# Media & DB (avoid large files in image)
+media/
+db.sqlite3
+
+# Node (just in case)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
