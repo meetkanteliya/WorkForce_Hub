@@ -3,47 +3,52 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install build deps (temporary)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+        gcc \
+        libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies in venv
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt \
+    && find /venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /venv -name "*.pyc" -delete \
+    && find /venv -name "*.pyo" -delete
 
 # ----------- RUNTIME STAGE -----------
 FROM python:3.11-slim
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/venv/bin:$PATH"
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/venv/bin:$PATH" \
+    PIP_NO_CACHE_DIR=1
 
-# Only runtime deps (NO gcc 🔥)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+        libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy virtual env from builder
 COPY --from=builder /venv /venv
 
 # Copy app code
 COPY . .
 
-# Clean cache
-RUN rm -rf /root/.cache
+# 🔥 IMPORTANT: DB folder + permission fix
+RUN mkdir -p /app/db \
+    && chown -R nobody:nogroup /app
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Fix entrypoint
+RUN chmod +x /app/entrypoint.sh
+
+USER nobody
 
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
