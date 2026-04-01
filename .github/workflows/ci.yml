@@ -14,30 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Docker Buildx (faster builds)
+      # 2. Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Cache Docker layers (important for speed)
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-docker-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docker-
-
-      # 4. Install Docker Compose
-      - name: Install Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install docker-compose -y
-
-      # 5. Build & start all services
+      # 3. Build & start all services (USE NEW COMMAND)
       - name: Build and start containers
-        run: docker-compose up --build -d
+        run: docker compose up --build -d
 
-      # 6. Wait until backend is ready (real check)
+      # 4. Wait for backend (retry logic)
       - name: Wait for backend
         run: |
           for i in {1..20}; do
@@ -49,23 +34,23 @@ jobs:
             sleep 3
           done
           echo "Backend failed to start"
-          docker logs workforcehub-backend
+          docker compose logs
           exit 1
 
-      # 7. Test backend
+      # 5. Test backend
       - name: Test Backend API
         run: curl -f http://localhost:8000
 
-      # 8. Test frontend
+      # 6. Test frontend
       - name: Test Frontend
         run: curl -f http://localhost:80
 
-      # 9. Show logs if something fails (debugging)
-      - name: Show container logs
+      # 7. Debug logs if failure
+      - name: Show logs on failure
         if: failure()
         run: docker compose logs
 
-      # 10. Shutdown
+      # 8. Shutdown cleanly
       - name: Shutdown containers
         if: always()
         run: docker compose down -v
