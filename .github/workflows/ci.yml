@@ -10,23 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
+      # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Docker Buildx
+      # 2. Docker buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Build & start all services (USE NEW COMMAND)
+      # 3. Build & start containers
       - name: Build and start containers
         run: docker compose up --build -d
 
-      # 4. Wait for backend (retry logic)
+      # 4. Wait for backend
       - name: Wait for backend
         run: |
           for i in {1..20}; do
-            if curl -s http://localhost:8000 > /dev/null; then
+            if curl -s http://localhost:8000/api/schema/ > /dev/null; then
               echo "Backend is up"
               exit 0
             fi
@@ -37,20 +37,20 @@ jobs:
           docker compose logs
           exit 1
 
-      # 5. Test backend
+      # 5. Test backend (FIXED)
       - name: Test Backend API
-        run: curl -f http://localhost:8000
+        run: curl -f http://localhost:8000/api/schema/
 
       # 6. Test frontend
       - name: Test Frontend
         run: curl -f http://localhost:80
 
-      # 7. Debug logs if failure
+      # 7. Logs on failure
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
 
-      # 8. Shutdown cleanly
+      # 8. Shutdown
       - name: Shutdown containers
         if: always()
         run: docker compose down -v
