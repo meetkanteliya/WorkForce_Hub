@@ -63,9 +63,9 @@ jobs:
       # 9. Show logs if something fails (debugging)
       - name: Show container logs
         if: failure()
-        run: docker-compose logs
+        run: docker compose logs
 
       # 10. Shutdown
       - name: Shutdown containers
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v
