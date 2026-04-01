@@ -1,0 +1,71 @@
+name: CI Pipeline - WorkforceHub
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Docker Buildx (faster builds)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Cache Docker layers (important for speed)
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      # 4. Install Docker Compose
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install docker-compose -y
+
+      # 5. Build & start all services
+      - name: Build and start containers
+        run: docker-compose up --build -d
+
+      # 6. Wait until backend is ready (real check)
+      - name: Wait for backend
+        run: |
+          for i in {1..20}; do
+            if curl -s http://localhost:8000 > /dev/null; then
+              echo "Backend is up"
+              exit 0
+            fi
+            echo "Waiting for backend..."
+            sleep 3
+          done
+          echo "Backend failed to start"
+          docker logs workforcehub-backend
+          exit 1
+
+      # 7. Test backend
+      - name: Test Backend API
+        run: curl -f http://localhost:8000
+
+      # 8. Test frontend
+      - name: Test Frontend
+        run: curl -f http://localhost:80
+
+      # 9. Show logs if something fails (debugging)
+      - name: Show container logs
+        if: failure()
+        run: docker-compose logs
+
+      # 10. Shutdown
+      - name: Shutdown containers
+        if: always()
+        run: docker-compose down -v
