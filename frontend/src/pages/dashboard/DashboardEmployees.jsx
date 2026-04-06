@@ -1,36 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../../api/axios';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchDashboardEmployees, selectDashboardEmployees } from '../../store/slices/dashboardSlice';
 import { HiOutlineArrowLeft, HiOutlineSearch, HiOutlineEye } from 'react-icons/hi';
 
 export default function DashboardEmployees() {
-    const [employees, setEmployees] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const { list: employees, meta, loading } = useSelector(selectDashboardEmployees);
+
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [page, setPage] = useState(1);
-    const [meta, setMeta] = useState({ count: 0, next: null, previous: null });
 
-    const fetchEmployees = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams({ page });
-            if (search) params.set('search', search);
-            if (roleFilter) params.set('role', roleFilter);
-            const res = await API.get(`/dashboard/employees/?${params}`);
-            setEmployees(res.data.results ?? res.data);
-            setMeta({ count: res.data.count || 0, next: res.data.next, previous: res.data.previous });
-        } catch (error) {
-            console.error('Failed to fetch employees:', error);
-        } finally { 
-            setLoading(false); 
-        }
+    useEffect(() => {
+        dispatch(fetchDashboardEmployees({ page, search, role: roleFilter }));
+    }, [page, roleFilter, dispatch]);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setPage(1);
+        dispatch(fetchDashboardEmployees({ page: 1, search, role: roleFilter }));
     };
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchEmployees(); }, [page, roleFilter]);
-
-    const handleSearch = (e) => { e.preventDefault(); setPage(1); fetchEmployees(); };
 
     return (
         <div className="animate-fade-in">

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, createElement } from 'react';
 import { createPortal } from 'react-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import API from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+import { selectUser, setProfilePic } from '../store/slices/authSlice';
 import { Link } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import AlertModal from '../components/AlertModal';
@@ -26,7 +27,8 @@ import {
 } from 'lucide-react';
 
 export default function Profile() {
-    const { user, setProfilePic } = useAuth();
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
     const [employee, setEmployee] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -177,7 +179,7 @@ export default function Profile() {
             await fetchProfileData();
             // Sync profile picture globally (sidebar etc.)
             const empRes = await API.get('/employees/me/');
-            if (empRes.data?.profile_picture) setProfilePic(empRes.data.profile_picture);
+            if (empRes.data?.profile_picture) dispatch(setProfilePic(empRes.data.profile_picture));
             setCropImage(null);
         } catch (err) {
             console.error('Upload error:', err);

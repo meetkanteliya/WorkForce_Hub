@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useDispatch } from 'react-redux';
+import { loginUser } from '../store/slices/authSlice';
 
 export default function Login() {
-    const { login } = useAuth();
+    const dispatch = useDispatch();
     const navigate = useNavigate();
     const [form, setForm] = useState({ username: '', password: '' });
     const [error, setError] = useState('');
@@ -14,10 +15,10 @@ export default function Login() {
         setError('');
         setLoading(true);
         try {
-            await login(form.username, form.password);
+            await dispatch(loginUser({ username: form.username, password: form.password })).unwrap();
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.detail || 'Invalid credentials');
+            setError(typeof err === 'string' ? err : 'Invalid credentials');
         } finally {
             setLoading(false);
         }

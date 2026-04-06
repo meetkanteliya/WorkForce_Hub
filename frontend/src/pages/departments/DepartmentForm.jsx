@@ -1,15 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    createDepartment,
+    updateDepartment,
+    clearDeptFormError,
+    selectDeptFormLoading,
+    selectDeptFormError,
+} from '../../store/slices/departmentSlice';
 import API from '../../api/axios';
 
 export default function DepartmentForm() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const isEdit = Boolean(id);
 
+    const loading = useSelector(selectDeptFormLoading);
+    const error = useSelector(selectDeptFormError);
+
     const [form, setForm] = useState({ name: '', description: '' });
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        dispatch(clearDeptFormError());
+        return () => dispatch(clearDeptFormError());
+    }, [dispatch]);
 
     useEffect(() => {
         if (isEdit) {
@@ -17,31 +32,21 @@ export default function DepartmentForm() {
                 setForm({ name: res.data.name, description: res.data.description || '' });
             });
         }
-    }, [id]);
+    }, [id, isEdit]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
+        dispatch(clearDeptFormError());
+
         try {
             if (isEdit) {
-                await API.put(`/departments/${id}/`, form);
+                await dispatch(updateDepartment({ id, payload: form })).unwrap();
             } else {
-                await API.post('/departments/', form);
+                await dispatch(createDepartment(form)).unwrap();
             }
             navigate('/departments');
-        } catch (err) {
-            const data = err.response?.data;
-            if (data) {
-                const messages = Object.entries(data).map(
-                    ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`
-                );
-                setError(messages.join(' | '));
-            } else {
-                setError('Failed to save department');
-            }
-        } finally {
-            setLoading(false);
+        } catch {
+            // Error handled by Redux state
         }
     };
 

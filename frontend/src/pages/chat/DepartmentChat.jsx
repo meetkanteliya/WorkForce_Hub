@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser } from '../../store/slices/authSlice';
+import {
+    fetchMessages,
+    addMessage,
+    clearChannel,
+    selectMessages,
+    selectLoadingHistory,
+} from '../../store/slices/chatSlice';
 import API from '../../api/axios';
 import { Send, Hash, MessageSquare, Clock } from 'lucide-react';
+
+function getBackendOrigin() {
+    return import.meta.env.VITE_BACKEND_ORIGIN || 'http://localhost:8000';
+}
 
 function getWsOrigin() {
     const origin = window.location.origin;
@@ -12,37 +24,36 @@ function getWsOrigin() {
 }
 
 export default function DepartmentChat() {
-    const { user } = useAuth();
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+
     const [departments, setDepartments] = useState([]);
     const [activeDept, setActiveDept] = useState(null);
-    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [ws, setWs] = useState(null);
-    const [loadingHistory, setLoadingHistory] = useState(false);
-    
+
+    const channelKey = activeDept ? `dept-${activeDept.id}` : null;
+    const messages = useSelector(selectMessages(channelKey || '__none__'));
+    const loadingHistory = useSelector(selectLoadingHistory(channelKey || '__none__'));
+
     const messagesEndRef = useRef(null);
 
     // 1. Fetch departments based on role
     useEffect(() => {
         const fetchDepts = async () => {
             try {
-                // Determine which departments to show
                 if (['admin', 'hr'].includes(user?.role)) {
-                    // Admins see all
                     const res = await API.get('/departments/');
                     const depts = res.data.results ?? res.data;
                     setDepartments(depts);
                     if (depts.length > 0) setActiveDept(depts[0]);
                 } else {
-                    // Employees only see their own department
                     const meRes = await API.get('/employees/me/');
                     const empDept = meRes.data.department;
                     if (empDept && typeof empDept === 'object') {
                         setDepartments([empDept]);
                         setActiveDept(empDept);
                     } else if (empDept) {
-                        // In case it comes back as ID, we need its name. 
-                        // But usually the serializer handles this. Fallback:
                         setDepartments([{ id: empDept, name: meRes.data.department_name || 'My Department' }]);
                         setActiveDept({ id: empDept, name: meRes.data.department_name || 'My Department' });
                     }
@@ -58,47 +69,38 @@ export default function DepartmentChat() {
     useEffect(() => {
         if (!activeDept) return;
 
-        // Load history via REST
-        const loadHistory = async () => {
-            setLoadingHistory(true);
-            try {
-                const res = await API.get(`/chat/messages/?department=${activeDept.id}`);
-                setMessages((res.data.results ?? res.data).reverse() || []); // newest at bottom
-            } catch (err) {
-                console.error("Failed to fetch chat history", err);
-            } finally {
-                setLoadingHistory(false);
-            }
-        };
-        loadHistory();
+        const key = `dept-${activeDept.id}`;
+
+        // Clear old channel messages and fetch new
+        dispatch(clearChannel({ key }));
+        dispatch(fetchMessages({ channel: 'department', departmentId: activeDept.id }));
 
         // Connect WebSocket
         const token = localStorage.getItem('access');
         const socketUrl = `${getWsOrigin()}/ws/chat/${activeDept.id}/?token=${token}`;
         const socket = new WebSocket(socketUrl);
 
-        socket.onopen = () => console.log('WebSocket Connected to', activeDept.name);
-        
         socket.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            setMessages((prev) => [...prev, {
-                id: data.id,
-                content: data.message,
-                sender: data.sender_id,
-                sender_name: data.sender_name,
-                sender_profile_picture: data.sender_profile_picture,
-                timestamp: data.timestamp
-            }]);
+            dispatch(addMessage({
+                key,
+                message: {
+                    id: data.id,
+                    content: data.message,
+                    sender: data.sender_id,
+                    sender_name: data.sender_name,
+                    sender_profile_picture: data.sender_profile_picture,
+                    timestamp: data.timestamp,
+                },
+            }));
         };
-
-        socket.onclose = () => console.log('WebSocket Disconnected');
 
         setWs(socket);
 
         return () => {
             if (socket) socket.close();
         };
-    }, [activeDept]);
+    }, [activeDept, dispatch]);
 
     // 3. Auto Scroll
     useEffect(() => {
@@ -108,7 +110,6 @@ export default function DepartmentChat() {
     const handleSend = (e) => {
         e.preventDefault();
         if (!input.trim() || !ws) return;
-
         ws.send(JSON.stringify({ message: input.trim() }));
         setInput('');
     };
@@ -186,7 +187,7 @@ export default function DepartmentChat() {
                                             {!isMe && showName ? (
                                                 <img
                                                     src={msg.sender_profile_picture 
-                                                        ? `http://localhost:8000${msg.sender_profile_picture}` 
+                                                        ? `${getBackendOrigin()}${msg.sender_profile_picture}` 
                                                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender_name)}&background=1A2B3C&color=fff`}
                                                     alt={msg.sender_name}
                                                     className="w-8 h-8 rounded-full shrink-0 object-cover mt-1 bg-slate-200 dark:bg-slate-800"

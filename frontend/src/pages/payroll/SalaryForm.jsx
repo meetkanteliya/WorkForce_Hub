@@ -1,11 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    createSalary,
+    updateSalary,
+    clearPayrollFormError,
+    selectPayrollFormLoading,
+    selectPayrollFormError,
+} from '../../store/slices/payrollSlice';
+import { fetchEmployees, selectEmployeeList } from '../../store/slices/employeeSlice';
 import API from '../../api/axios';
 
 export default function SalaryForm() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const isEdit = Boolean(id);
+
+    const loading = useSelector(selectPayrollFormLoading);
+    const error = useSelector(selectPayrollFormError);
+    const employees = useSelector(selectEmployeeList);
 
     const [form, setForm] = useState({
         employee: '',
@@ -14,13 +28,14 @@ export default function SalaryForm() {
         deductions: '0',
         pay_date: '',
     });
-    const [employees, setEmployees] = useState([]);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        API.get('/employees/').then((r) => setEmployees(r.data.results ?? r.data)).catch(() => { });
+        dispatch(clearPayrollFormError());
+        dispatch(fetchEmployees());
+        return () => dispatch(clearPayrollFormError());
+    }, [dispatch]);
 
+    useEffect(() => {
         if (isEdit) {
             API.get(`/payroll/${id}/`).then((res) => {
                 const s = res.data;
@@ -33,44 +48,22 @@ export default function SalaryForm() {
                 });
             });
         }
-    }, [id]);
+    }, [id, isEdit]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const payload = {
-                employee: parseInt(form.employee),
-                basic_salary: form.basic_salary,
-                bonus: form.bonus,
-                deductions: form.deductions,
-                pay_date: form.pay_date,
-            };
+        dispatch(clearPayrollFormError());
 
+        try {
             if (isEdit) {
-                await API.put(`/payroll/${id}/`, payload);
+                await dispatch(updateSalary({ id, payload: form })).unwrap();
             } else {
-                await API.post('/payroll/', payload);
+                await dispatch(createSalary(form)).unwrap();
             }
             navigate('/payroll');
-        } catch (err) {
-            const data = err.response?.data;
-            if (data) {
-                if (typeof data === 'string') {
-                    setError(data);
-                } else if (data.detail) {
-                    setError(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
-                } else {
-                    const messages = Object.entries(data).map(
-                        ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`
-                    );
-                    setError(messages.join(' | '));
-                }
-            } else {
-                setError('Failed to save salary record');
-            }
-        } finally { setLoading(false); }
+        } catch {
+            // Error handled by Redux state
+        }
     };
 
     return (

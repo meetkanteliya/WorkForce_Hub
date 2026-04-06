@@ -1,18 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../../api/axios';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchDashboardLeaveOverview, selectDashboardLeaveOverview } from '../../store/slices/dashboardSlice';
 import { HiOutlineArrowLeft } from 'react-icons/hi';
 
 export default function DashboardLeaveOverview() {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const { data, loading } = useSelector(selectDashboardLeaveOverview);
 
     useEffect(() => {
-        API.get('/dashboard/leaves/overview/')
-            .then((res) => setData(res.data))
-            .catch(() => { })
-            .finally(() => setLoading(false));
-    }, []);
+        dispatch(fetchDashboardLeaveOverview());
+    }, [dispatch]);
 
     if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 

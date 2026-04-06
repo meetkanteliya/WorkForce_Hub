@@ -1,6 +1,7 @@
 import { useMemo, createElement } from 'react';
 import { Link } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectIsDarkMode, toggleTheme } from '../store/slices/themeSlice';
 import {
   ArrowRight,
   Building2,
@@ -99,7 +100,8 @@ function StackBadge({ label }) {
 }
 
 export default function LandingPage() {
-  const { isDarkMode, toggleTheme } = useTheme();
+  const dispatch = useDispatch();
+  const isDarkMode = useSelector(selectIsDarkMode);
 
   const featureCards = useMemo(
     () => [
@@ -207,7 +209,7 @@ export default function LandingPage() {
             </button>
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={() => dispatch(toggleTheme())}
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white/70 p-2 text-slate-700 shadow-sm shadow-slate-900/5 transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >

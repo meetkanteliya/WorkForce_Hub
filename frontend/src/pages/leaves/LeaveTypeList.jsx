@@ -1,44 +1,48 @@
 import { useState, useEffect } from 'react';
-import API from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../../store/slices/authSlice';
+import {
+    fetchLeaveTypes,
+    createLeaveType,
+    clearTypeFormError,
+    selectLeaveTypes,
+    selectTypesLoading,
+    selectTypeFormLoading,
+    selectTypeFormError,
+} from '../../store/slices/leaveSlice';
 import { HiOutlinePlus } from 'react-icons/hi';
 
 export default function LeaveTypeList() {
-    const { hasRole } = useAuth();
-    const [types, setTypes] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
+
+    const types = useSelector(selectLeaveTypes);
+    const loading = useSelector(selectTypesLoading);
+    const saving = useSelector(selectTypeFormLoading);
+    const error = useSelector(selectTypeFormError);
+
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', max_days_per_year: '' });
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
 
-    const fetchTypes = async () => {
-        try {
-            const res = await API.get('/leaves/types/');
-            setTypes(res.data.results ?? res.data);
-        } catch (err) {
-            console.error('[LeaveTypeList] Failed to fetch leave types', err);
-            setTypes([]);
-        } finally { setLoading(false); }
-    };
+    useEffect(() => {
+        dispatch(fetchLeaveTypes());
+    }, [dispatch]);
 
-    useEffect(() => { fetchTypes(); }, []);
+    // Clear error when toggling form
+    useEffect(() => {
+        dispatch(clearTypeFormError());
+    }, [showForm, dispatch]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
-        setError('');
-        setSaving(true);
         try {
-            const res = await API.post('/leaves/types/', {
-                name: form.name,
-                max_days_per_year: parseInt(form.max_days_per_year),
-            });
-            setTypes((prev) => [...prev, res.data]);
+            await dispatch(createLeaveType(form)).unwrap();
             setForm({ name: '', max_days_per_year: '' });
             setShowForm(false);
-        } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to create');
-        } finally { setSaving(false); }
+        } catch {
+            // Error set in Redux state
+        }
     };
 
     if (loading) {

@@ -1,7 +1,13 @@
-import { useState, useEffect, createElement } from 'react';
+import { useEffect, createElement } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import API from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../../store/slices/authSlice';
+import {
+    fetchEmployee,
+    clearDetail,
+    selectEmployeeDetail,
+    selectEmployeeDetailLoading,
+} from '../../store/slices/employeeSlice';
 import {
     Mail,
     Phone,
@@ -18,16 +24,18 @@ import {
 
 export default function EmployeeDetail() {
     const { id } = useParams();
-    const { hasRole } = useAuth();
-    const [employee, setEmployee] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
+    const employee = useSelector(selectEmployeeDetail);
+    const loading = useSelector(selectEmployeeDetailLoading);
 
     useEffect(() => {
-        API.get(`/employees/${id}/`)
-            .then((res) => setEmployee(res.data))
-            .catch(() => { })
-            .finally(() => setLoading(false));
-    }, [id]);
+        dispatch(fetchEmployee(id));
+        return () => {
+            dispatch(clearDetail());
+        };
+    }, [id, dispatch]);
 
     if (loading) {
         return (
@@ -119,7 +127,7 @@ export default function EmployeeDetail() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* User Credentials (Added) */}
+                {/* User Credentials */}
                 <div className="glass-panel rounded-2xl p-6 md:col-span-2 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <ShieldCheck className="w-24 h-24 text-slate-400" />

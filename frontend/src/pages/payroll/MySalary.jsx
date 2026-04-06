@@ -1,29 +1,17 @@
-import { useState, useEffect } from 'react';
-import API from '../../api/axios';
+import { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchSalaries, selectSalaryList, selectSalaryLoading } from '../../store/slices/payrollSlice';
 import { HiOutlineCurrencyDollar, HiOutlineCalendar, HiOutlineTrendingUp, HiOutlineTrendingDown } from 'react-icons/hi';
 import dayjs from 'dayjs';
 
 export default function MySalary() {
-    const [salaries, setSalaries] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const salaries = useSelector(selectSalaryList);
+    const loading = useSelector(selectSalaryLoading);
 
     useEffect(() => {
-        fetchSalaries();
-    }, []);
-
-    const fetchSalaries = async () => {
-        try {
-            const res = await API.get('/payroll/my/');
-            // Handle both paginated and unpaginated responses
-            const data = res.data.results !== undefined ? res.data.results : res.data;
-            setSalaries(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to fetch salary data:', error);
-            setSalaries([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        dispatch(fetchSalaries({ tab: 'my' }));
+    }, [dispatch]);
 
     if (loading) {
         return (

@@ -2,8 +2,19 @@ import { useState, useEffect, createElement } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Link, useSearchParams } from 'react-router-dom';
-import API from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../../store/slices/authSlice';
+import {
+    fetchLeaveRequests,
+    fetchBalances as fetchBalancesThunk,
+    actionLeaveRequest,
+    adjustBalance,
+    selectLeaveRequests,
+    selectRequestsLoading,
+    selectBalances,
+    selectBalanceLoading,
+} from '../../store/slices/leaveSlice';
+import { fetchDepartments, selectDepartmentList } from '../../store/slices/departmentSlice';
 import AlertModal from '../../components/AlertModal';
 import {
     Plus, CheckCircle, XCircle, Clock4, Search,
@@ -22,22 +33,24 @@ function getBaseAllocation(leaveType) {
 }
 
 export default function LeaveRequestList() {
-    const { hasRole } = useAuth();
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
     const [searchParams, setSearchParams] = useSearchParams();
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    // Redux state
+    const requests = useSelector(selectLeaveRequests);
+    const loading = useSelector(selectRequestsLoading);
+    const balances = useSelector(selectBalances);
+    const balanceLoading = useSelector(selectBalanceLoading);
+    const departments = useSelector(selectDepartmentList);
+
     const [tab, setTab] = useState(searchParams.get('tab') || (hasRole('admin', 'hr') ? 'all' : 'my'));
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
     const [searchQuery, setSearchQuery] = useState('');
-
     const [departmentFilter, setDepartmentFilter] = useState('All');
 
-    // Dynamic Departments
-    const [departments, setDepartments] = useState([]);
-
-    // Balance management state
-    const [balances, setBalances] = useState([]);
-    const [balanceLoading, setBalanceLoading] = useState(false);
+    // Balance edit state (local UI)
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ allocated_days: 0, used_days: 0 });
     const [balanceSearch, setBalanceSearch] = useState('');
@@ -56,52 +69,19 @@ export default function LeaveRequestList() {
         setCurrentPage(1);
     }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter]);
 
-    // ─── Fetch leave requests ───
-    const fetchRequests = async (currentTab) => {
-        setLoading(true);
-        try {
-            const endpoint = currentTab === 'my' ? '/leaves/requests/my/' : '/leaves/requests/';
-            const res = await API.get(endpoint);
-            const data = res.data.results ?? res.data;
-            setRequests(Array.isArray(data) ? data : []);
-        } catch (err) {
-            console.error('[LeaveRequestList] Error:', err);
-            setRequests([]);
-        } finally { setLoading(false); }
-    };
-
-    // ─── Fetch balances (admin/hr only) ───
-    const fetchBalances = async () => {
-        setBalanceLoading(true);
-        try {
-            const res = await API.get('/leaves/balances/');
-            setBalances(res.data.results ?? res.data);
-        } catch (err) {
-            console.error('[LeaveRequestList] Failed to fetch balances', err);
-            setBalances([]);
-        } finally { setBalanceLoading(false); }
-    };
-
+    // ─── Fetch data via Redux ───
     useEffect(() => {
         if (tab === 'balances') {
-            fetchBalances();
+            dispatch(fetchBalancesThunk());
         } else {
-            fetchRequests(tab);
+            dispatch(fetchLeaveRequests({ tab }));
         }
-    }, [tab]);
+    }, [tab, dispatch]);
 
-    // Fetch live departments for filters
+    // Fetch departments for filters (once)
     useEffect(() => {
-        const fetchDepartments = async () => {
-            try {
-                const res = await API.get('/departments/');
-                setDepartments(res.data.results ?? res.data);
-            } catch (err) {
-                console.error('[LeaveRequestList] Failed to fetch departments', err);
-            }
-        };
-        fetchDepartments();
-    }, []);
+        dispatch(fetchDepartments());
+    }, [dispatch]);
 
     // Sync URL params
     useEffect(() => {
@@ -113,13 +93,9 @@ export default function LeaveRequestList() {
 
     const handleAction = async (id, action) => {
         try {
-            await API.patch(`/leaves/requests/${id}/${action}/`);
-            setRequests((prev) =>
-                prev.map((r) => (r.id === id ? { ...r, status: action === 'approve' ? 'approved' : 'rejected' } : r))
-            );
+            await dispatch(actionLeaveRequest({ id, action })).unwrap();
         } catch (err) {
-            const detail = err.response?.data?.detail;
-            setAlertMessage(detail || `Failed to ${action} leave`);
+            setAlertMessage(err || `Failed to ${action} leave`);
             setAlertVariant('error');
             setAlertOpen(true);
         }
@@ -142,22 +118,18 @@ export default function LeaveRequestList() {
                 allocated_days: allocatedNext,
                 used_days: Number(editForm.used_days)
             };
-            const res = await API.patch(`/leaves/balances/${balance.id}/adjust/`, payload);
-            setBalances((prev) =>
-                prev.map((b) => (b.id === balance.id ? res.data : b))
-            );
+            const res = await dispatch(adjustBalance({ balanceId: balance.id, payload })).unwrap();
 
-            // If the modal is open, we need to update the selectedEmployeeBalances state directly so it re-renders
+            // If the modal is open, update the selectedEmployeeBalances state
             if (selectedEmployeeBalances) {
                 setSelectedEmployeeBalances(prev =>
-                    prev.map(b => b.id === balance.id ? res.data : b)
+                    prev.map(b => b.id === balance.id ? res : b)
                 );
             }
 
             setEditingId(null);
         } catch (err) {
-            console.error('Adjust balance error:', err.response?.data || err.message);
-            setAlertMessage(err.response?.data?.detail || 'Failed to adjust balance');
+            setAlertMessage(err || 'Failed to adjust balance');
             setAlertVariant('error');
             setAlertOpen(true);
         }

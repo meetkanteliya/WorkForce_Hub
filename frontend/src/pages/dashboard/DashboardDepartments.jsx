@@ -1,30 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import API from '../../api/axios';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    fetchDashboardDepartments,
+    fetchDashboardDepartmentDetail,
+    clearDepartmentDetail,
+    selectDashboardDepartments,
+} from '../../store/slices/dashboardSlice';
 import { HiOutlineArrowLeft, HiOutlineEye } from 'react-icons/hi';
 
 export default function DashboardDepartments() {
     const { id } = useParams();
-    const [departments, setDepartments] = useState([]);
-    const [detail, setDetail] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const { list: departments, detail, loading } = useSelector(selectDashboardDepartments);
 
     useEffect(() => {
-        const fetch = async () => {
-            try {
-                if (id) {
-                    const res = await API.get(`/dashboard/departments/${id}/`);
-                    setDetail(res.data);
-                } else {
-                    const res = await API.get('/dashboard/departments/');
-                    setDepartments(res.data.results ?? res.data);
-                }
-            } catch (err) {
-                console.error('[DashboardDepartments] Failed to load', err);
-            } finally { setLoading(false); }
-        };
-        fetch();
-    }, [id]);
+        if (id) {
+            dispatch(fetchDashboardDepartmentDetail(id));
+        } else {
+            dispatch(clearDepartmentDetail());
+            dispatch(fetchDashboardDepartments());
+        }
+    }, [id, dispatch]);
 
     if (loading) return <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>;
 

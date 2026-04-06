@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, createElement } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useSelector } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../store/slices/authSlice';
 import API from '../api/axios';
 import {
     Users,
@@ -26,7 +27,8 @@ import {
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 export default function Dashboard() {
-    const { user, hasRole } = useAuth();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [mockData, setMockData] = useState(null);

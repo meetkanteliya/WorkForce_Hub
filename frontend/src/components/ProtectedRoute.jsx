@@ -1,8 +1,10 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectUser } from '../store/slices/authSlice';
 
 export default function ProtectedRoute({ children, roles }) {
-    const { isAuthenticated, user } = useAuth();
+    const isAuthenticated = useSelector(selectIsAuthenticated);
+    const user = useSelector(selectUser);
 
     if (!isAuthenticated) {
         return <Navigate to="/" replace />;

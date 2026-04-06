@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, selectProfilePic, logout } from '../store/slices/authSlice';
+import { selectIsDarkMode, toggleTheme } from '../store/slices/themeSlice';
 import API from '../api/axios';
 import {
     LayoutDashboard,
@@ -36,8 +37,10 @@ const navItems = [
 ];
 
 export default function Layout() {
-    const { user, logout, profilePic } = useAuth();
-    const { isDarkMode, toggleTheme } = useTheme();
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const profilePic = useSelector(selectProfilePic);
+    const isDarkMode = useSelector(selectIsDarkMode);
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -57,7 +60,7 @@ export default function Layout() {
 
     const confirmLogout = () => {
         setShowLogoutModal(false);
-        logout();
+        dispatch(logout());
         navigate('/');
     };
 
@@ -318,7 +321,7 @@ export default function Layout() {
 
                         {/* Theme Toggle */}
                         <button
-                            onClick={toggleTheme}
+                            onClick={() => dispatch(toggleTheme())}
                             className={`relative p-2 rounded-lg transition-all duration-300 overflow-hidden ${isDarkMode ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >

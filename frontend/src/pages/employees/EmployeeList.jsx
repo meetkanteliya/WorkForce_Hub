@@ -2,8 +2,17 @@
 import { useState, useEffect, useCallback, createElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
-import API from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../../store/slices/authSlice';
+import {
+    fetchEmployees,
+    deleteEmployee,
+    selectEmployeeList,
+    selectEmployeeMeta,
+    selectEmployeeLoading,
+    selectEmployeeDeleteLoading,
+} from '../../store/slices/employeeSlice';
+import { fetchDepartments, selectDepartmentList } from '../../store/slices/departmentSlice';
 import AlertModal from '../../components/AlertModal';
 import {
     Plus,
@@ -19,84 +28,44 @@ import {
 } from 'lucide-react';
 
 export default function EmployeeList() {
-    const { hasRole } = useAuth();
-    const [employees, setEmployees] = useState([]);
-    const [departments, setDepartments] = useState([]);
-    const [searchParams] = useSearchParams();
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
 
+    const employees = useSelector(selectEmployeeList);
+    const meta = useSelector(selectEmployeeMeta);
+    const loading = useSelector(selectEmployeeLoading);
+    const isDeleting = useSelector(selectEmployeeDeleteLoading);
+    const departments = useSelector(selectDepartmentList);
+
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+    const [page, setPage] = useState(1);
 
-    const [loading, setLoading] = useState(true);
     const [employeeToDelete, setEmployeeToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [alertOpen, setAlertOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
 
-    // backend pagination
-    const [page, setPage] = useState(1);
-    const [meta, setMeta] = useState({
-        count: 0,
-        next: null,
-        previous: null
-    });
-
-    const fetchEmployees = useCallback(async () => {
-        setLoading(true);
-        try {
-            const params = {
-                page,
-                search: search || undefined,
-                department: departmentFilter || undefined,
-                status: statusFilter || undefined,
-            };
-            const res = await API.get('/employees/', { params });
-            const results = res.data?.results ?? res.data;
-            setEmployees(results);
-            setMeta({
-                count: res.data.count,
-                next: res.data.next,
-                previous: res.data.previous
-            });
-        } catch (err) {
-            console.error('Failed to fetch employees:', err);
-            setEmployees([]);
-            setMeta({ count: 0, next: null, previous: null });
-        } finally {
-            setLoading(false);
-        }
-    }, [page, search, departmentFilter, statusFilter]);
-
-    const fetchDepartments = async () => {
-        try {
-            const res = await API.get('/departments/');
-            setDepartments(res.data.results ?? res.data);
-        } catch (err) {
-            console.error('Failed to fetch departments:', err);
-        }
-    };
-
+    // Fetch employees when filters/page change
     useEffect(() => {
-        fetchEmployees();
-    }, [fetchEmployees]);
+        dispatch(fetchEmployees({ page, search, department: departmentFilter, status: statusFilter }));
+    }, [dispatch, page, search, departmentFilter, statusFilter]);
 
+    // Fetch departments for filter dropdown (once)
     useEffect(() => {
-        fetchDepartments();
-    }, []);
+        dispatch(fetchDepartments());
+    }, [dispatch]);
 
     const confirmDelete = async () => {
         if (!employeeToDelete) return;
-        setIsDeleting(true);
         try {
-            await API.delete(`/employees/${employeeToDelete.id}/`);
-            setEmployees(prev => prev.filter(e => e.id !== employeeToDelete.id));
+            await dispatch(deleteEmployee(employeeToDelete.id)).unwrap();
             setEmployeeToDelete(null);
         } catch {
             setAlertMessage('Failed to delete employee');
             setAlertOpen(true);
-        } finally {
-            setIsDeleting(false);
         }
     };
 

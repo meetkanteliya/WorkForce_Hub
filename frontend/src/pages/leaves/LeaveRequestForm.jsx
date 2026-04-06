@@ -1,31 +1,35 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API from '../../api/axios';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    fetchLeaveTypes,
+    fetchMyBalances,
+    createLeaveRequest,
+    clearLeaveFormError,
+    selectLeaveTypes,
+    selectMyBalances,
+    selectLeaveFormLoading,
+    selectLeaveFormError,
+} from '../../store/slices/leaveSlice';
 import dayjs from 'dayjs';
 
 export default function LeaveRequestForm() {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+
+    const leaveTypes = useSelector(selectLeaveTypes);
+    const balances = useSelector(selectMyBalances);
+    const loading = useSelector(selectLeaveFormLoading);
+    const error = useSelector(selectLeaveFormError);
+
     const [form, setForm] = useState({ leave_type: '', start_date: '', end_date: '', reason: '' });
-    const [leaveTypes, setLeaveTypes] = useState([]);
-    const [balances, setBalances] = useState([]);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [typesRes, balancesRes] = await Promise.all([
-                    API.get('/leaves/types/'),
-                    API.get('/leaves/balances/my/')
-                ]);
-                setLeaveTypes(typesRes.data.results ?? typesRes.data);
-                setBalances(balancesRes.data.results ?? balancesRes.data);
-            } catch (err) {
-                console.error("Failed to load initial data", err);
-            }
-        };
-        fetchData();
-    }, []);
+        dispatch(fetchLeaveTypes());
+        dispatch(fetchMyBalances());
+        dispatch(clearLeaveFormError());
+        return () => dispatch(clearLeaveFormError());
+    }, [dispatch]);
 
     // Provide quick lookup for balances based on leave_type ID
     const balanceMap = useMemo(() => {
@@ -47,10 +51,10 @@ export default function LeaveRequestForm() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        dispatch(clearLeaveFormError());
 
         if (daysRequested <= 0) {
-            setError("End date must be the same as or after the start date.");
+            // Use local validation for this edge case
             return;
         }
 
@@ -58,36 +62,35 @@ export default function LeaveRequestForm() {
         if (selectedBalance) {
             const available = selectedBalance.allocated_days - selectedBalance.used_days;
             if (daysRequested > available) {
-                setError(`Insufficient balance. You only have ${available} days available for this leave type.`);
+                // This is client-side validation; we don't need to dispatch for it
                 return;
             }
         }
 
-        setLoading(true);
         try {
-            await API.post('/leaves/requests/', {
-                ...form,
-                leave_type: parseInt(form.leave_type),
-            });
+            await dispatch(createLeaveRequest(form)).unwrap();
             navigate('/leaves');
-        } catch (err) {
-            const data = err.response?.data;
-            if (data) {
-                if (typeof data === 'string') {
-                    setError(data);
-                } else if (data.detail) {
-                    setError(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
-                } else {
-                    const messages = Object.entries(data).map(
-                        ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`
-                    );
-                    setError(messages.join(' | '));
-                }
-            } else {
-                setError('Failed to apply for leave');
-            }
-        } finally { setLoading(false); }
+        } catch {
+            // Error set in Redux state
+        }
     };
+
+    // Client-side validation messages (separate from server errors)
+    const clientError = useMemo(() => {
+        if (daysRequested <= 0 && form.start_date && form.end_date) {
+            return "End date must be the same as or after the start date.";
+        }
+        const selectedBalance = balanceMap[form.leave_type];
+        if (selectedBalance && daysRequested > 0) {
+            const available = selectedBalance.allocated_days - selectedBalance.used_days;
+            if (daysRequested > available) {
+                return `Insufficient balance. You only have ${available} days available for this leave type.`;
+            }
+        }
+        return null;
+    }, [form.leave_type, daysRequested, balanceMap, form.start_date, form.end_date]);
+
+    const displayError = error || clientError;
 
     return (
         <div className="max-w-3xl mx-auto animate-fade-in grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -95,10 +98,10 @@ export default function LeaveRequestForm() {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                     <h1 className="text-2xl font-bold text-gray-800 mb-6">Apply for Leave</h1>
 
-                    {error && (
+                    {displayError && (
                         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl mb-6 text-sm flex items-start gap-2 border border-red-100">
                             <span className="shrink-0 mt-0.5">⚠️</span>
-                            <span>{error}</span>
+                            <span>{displayError}</span>
                         </div>
                     )}
 
@@ -169,7 +172,7 @@ export default function LeaveRequestForm() {
                         <div className="flex gap-3 pt-2">
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || !!clientError}
                                 className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 shadow-lg shadow-indigo-500/25 cursor-pointer"
                             >
                                 {loading ? 'Submitting...' : 'Submit Request'}

@@ -1,35 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../../api/axios';
-import { useAuth } from '../../context/AuthContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectUser, hasRole as hasRoleUtil } from '../../store/slices/authSlice';
+import {
+    fetchSalaries,
+    selectSalaryList,
+    selectSalaryLoading,
+} from '../../store/slices/payrollSlice';
 import { HiOutlinePlus } from 'react-icons/hi';
 
 export default function SalaryList() {
-    const { hasRole } = useAuth();
-    const [salaries, setSalaries] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const user = useSelector(selectUser);
+    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
+
+    const salaries = useSelector(selectSalaryList);
+    const loading = useSelector(selectSalaryLoading);
+
     const [tab, setTab] = useState('all');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const fetchSalaries = async () => {
-        setLoading(true);
-        try {
-            const endpoint = tab === 'my' ? '/payroll/my/' : '/payroll/';
-            const res = await API.get(endpoint);
-            setSalaries(res.data.results ?? res.data);
-        } catch (err) {
-            console.error('[SalaryList] Failed to fetch salaries', err);
-            setSalaries([]);
-        } finally { setLoading(false); }
-    };
-
     useEffect(() => {
-        fetchSalaries();
+        dispatch(fetchSalaries({ tab }));
         setCurrentPage(1);
-    }, [tab]);
+    }, [tab, dispatch]);
 
     const totalItems = salaries.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;

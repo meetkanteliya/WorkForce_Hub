@@ -1,34 +1,49 @@
 import { useState, useEffect, createElement } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    createEmployee,
+    updateEmployee,
+    clearFormError,
+    selectEmployeeFormLoading,
+    selectEmployeeFormError,
+} from '../../store/slices/employeeSlice';
+import { fetchDepartments, selectDepartmentList } from '../../store/slices/departmentSlice';
 import API from '../../api/axios';
 import { User, Mail, Phone, Building2, BriefcaseBusiness, Calendar, Lock, ShieldCheck, ChevronLeft } from 'lucide-react';
 
 export default function EmployeeForm() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const isEdit = Boolean(id);
 
+    const formLoading = useSelector(selectEmployeeFormLoading);
+    const formError = useSelector(selectEmployeeFormError);
+    const departments = useSelector(selectDepartmentList);
+
     const [form, setForm] = useState({
-        // For existing
         user_id: '',
         department: '',
         phone: '',
         designation: '',
         date_of_joining: '',
         email: '',
-
-        // For new
         username: '',
         password: '',
         role: 'employee',
-        createNewUser: true, // Toggle between new/existing user
+        createNewUser: true,
     });
-    const [departments, setDepartments] = useState([]);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
 
+    // Clear form error on mount/unmount
     useEffect(() => {
-        API.get('/departments/').then((r) => setDepartments(r.data.results ?? r.data)).catch(() => { });
+        dispatch(clearFormError());
+        return () => dispatch(clearFormError());
+    }, [dispatch]);
+
+    // Load departments & existing employee data for edit
+    useEffect(() => {
+        dispatch(fetchDepartments());
 
         if (isEdit) {
             API.get(`/employees/${id}/`).then((res) => {
@@ -44,7 +59,7 @@ export default function EmployeeForm() {
                 }));
             });
         }
-    }, [id]);
+    }, [id, dispatch, isEdit]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -56,53 +71,37 @@ export default function EmployeeForm() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const payload = { ...form };
+        dispatch(clearFormError());
 
-            if (!isEdit) {
-                if (payload.createNewUser) {
-                    delete payload.user_id;
-                } else {
-                    payload.user_id = parseInt(payload.user_id);
-                    delete payload.username;
-                    delete payload.password;
-                    delete payload.role;
-                }
+        const payload = { ...form };
+
+        if (!isEdit) {
+            if (payload.createNewUser) {
+                delete payload.user_id;
             } else {
-                delete payload.createNewUser;
+                payload.user_id = parseInt(payload.user_id);
                 delete payload.username;
                 delete payload.password;
                 delete payload.role;
             }
+        } else {
+            delete payload.createNewUser;
+            delete payload.username;
+            delete payload.password;
+            delete payload.role;
+        }
 
-            payload.department = payload.department ? parseInt(payload.department) : null;
+        payload.department = payload.department ? parseInt(payload.department) : null;
 
+        try {
             if (isEdit) {
-                await API.put(`/employees/${id}/`, payload);
+                await dispatch(updateEmployee({ id, payload })).unwrap();
             } else {
-                await API.post('/employees/', payload);
+                await dispatch(createEmployee(payload)).unwrap();
             }
             navigate('/employees');
-        } catch (err) {
-            const data = err.response?.data;
-            if (data && typeof data === 'object') {
-                if (data.detail) {
-                    setError(data.detail);
-                } else if (Array.isArray(data)) {
-                    setError(data[0]);
-                } else {
-                    const messages = Object.entries(data).map(
-                        ([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)}: ${Array.isArray(v) ? v.join(', ') : v}`
-                    );
-                    setError(messages.join(' | '));
-                }
-            } else {
-                setError('Failed to save employee data. Please try again.');
-            }
-        } finally {
-            setLoading(false);
+        } catch {
+            // Error is set in Redux state via rejected thunk
         }
     };
 
@@ -125,12 +124,12 @@ export default function EmployeeForm() {
                 </div>
             </div>
 
-            {error && (
+            {formError && (
                 <div className="mb-6 bg-rose-50 text-rose-600 px-5 py-4 rounded-xl text-sm flex items-start gap-3 border border-rose-200">
                     <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
                         <span className="font-bold block mb-0.5">Validation Error</span>
-                        {error}
+                        {formError}
                     </div>
                 </div>
             )}
@@ -139,7 +138,6 @@ export default function EmployeeForm() {
 
                 {!isEdit && (
                     <div className="glass-panel p-6 rounded-2xl relative overflow-hidden">
-                        {/* Decorative background */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[#2563EB]/5 rounded-bl-[100px] pointer-events-none" />
 
                         <div className="flex items-center justify-between mb-6">
@@ -250,10 +248,10 @@ export default function EmployeeForm() {
                     </button>
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={formLoading}
                         className="flex-[2] bg-[#1A2B3C] text-white py-3 px-4 rounded-xl font-bold hover:bg-[#0F172A] transition-all disabled:opacity-50 shadow-lg shadow-[#1A2B3C]/20 border border-[#1A2B3C]"
                     >
-                        {loading ? (
+                        {formLoading ? (
                             <span className="flex items-center justify-center gap-2">
                                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 Processing...
@@ -284,8 +282,6 @@ function InputField({ icon: Icon, label, name, type = "text", value, onChange, r
                         if (name === 'phone' || name === 'emergency_contact_phone') {
                             const val = e.target.value;
                             if (val && !/^[0-9+() -]*$/.test(val)) return;
-                            
-                            // Restrict to max 10 digits
                             const digitsOnly = val.replace(/[^0-9]/g, '');
                             if (digitsOnly.length > 10) return;
                         }

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../../api/axios';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchDashboardLeavesPending, selectDashboardLeavesPending } from '../../store/slices/dashboardSlice';
 import { HiOutlineArrowLeft } from 'react-icons/hi';
 
 const statusStyles = {
@@ -10,15 +11,12 @@ const statusStyles = {
 };
 
 export default function DashboardLeavesPending() {
-    const [leaves, setLeaves] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const { list: leaves, loading } = useSelector(selectDashboardLeavesPending);
 
     useEffect(() => {
-        API.get('/dashboard/leaves/pending/')
-            .then((res) => setLeaves(res.data.results ?? res.data))
-            .catch(() => { })
-            .finally(() => setLoading(false));
-    }, []);
+        dispatch(fetchDashboardLeavesPending());
+    }, [dispatch]);
 
     return (
         <div className="animate-fade-in">
