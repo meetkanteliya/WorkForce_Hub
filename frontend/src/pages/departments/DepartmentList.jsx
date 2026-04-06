@@ -98,7 +98,7 @@ export default function DepartmentList() {
                             </tr>
                         ) : (
                             currentDepartments.map((dept) => (
-                                <tr key={dept.id} className="hover:bg-gray-50/50 transition-colors">
+                                <tr key={dept.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4">
                                         <span className="font-semibold text-gray-800">{dept.name}</span>
                                     </td>

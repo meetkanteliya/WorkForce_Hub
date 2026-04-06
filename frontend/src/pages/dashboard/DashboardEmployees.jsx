@@ -67,7 +67,7 @@ export default function DashboardEmployees() {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {employees.map((emp) => (
-                                    <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <img

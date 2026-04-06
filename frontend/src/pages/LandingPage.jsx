@@ -253,7 +253,7 @@ export default function LandingPage() {
                 </Badge>
               </div>
 
-              <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
+              <h1 className="mt-6 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl dark:text-white">
                 WorkForce Hub
               </h1>
               <p className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-200">
@@ -288,24 +288,24 @@ export default function LandingPage() {
                     <Users className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Workforce</p>
                   </div>
-                  <p className="mt-2 text-sm font-extrabold text-slate-900">Employee Directory</p>
-                  <p className="mt-1 text-xs text-slate-600">Profiles, roles, departments.</p>
+                  <p className="mt-2 text-sm font-extrabold text-slate-900 dark:text-white">Employee Directory</p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Profiles, roles, departments.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm shadow-slate-900/5 backdrop-blur transition-colors dark:border-white/10 dark:bg-white/5">
                   <div className="flex items-center gap-2 text-slate-700">
                     <ClipboardCheck className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Approvals</p>
                   </div>
-                  <p className="mt-2 text-sm font-extrabold text-slate-900">Leave Workflows</p>
-                  <p className="mt-1 text-xs text-slate-600">Balances and audits.</p>
+                  <p className="mt-2 text-sm font-extrabold text-slate-900 dark:text-white">Leave Workflows</p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Balances and audits.</p>
                 </div>
                 <div className="hidden rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm shadow-slate-900/5 backdrop-blur transition-colors dark:border-white/10 dark:bg-white/5 sm:block">
                   <div className="flex items-center gap-2 text-slate-700">
                     <MessageSquare className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Realtime</p>
                   </div>
-                  <p className="mt-2 text-sm font-extrabold text-slate-900">Chat & Presence</p>
-                  <p className="mt-1 text-xs text-slate-600">Fast team coordination.</p>
+                  <p className="mt-2 text-sm font-extrabold text-slate-900 dark:text-white">Chat & Presence</p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Fast team coordination.</p>
                 </div>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function LandingPage() {
                     <div className="grid grid-cols-3 gap-4">
                       <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors dark:border-white/10 dark:bg-white/5">
                         <div className="flex items-center gap-2 text-slate-700">
-                          <FileText className="h-4 w-4 text-indigo-600" />
+                          <FileText className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                           <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">My Salary</p>
                         </div>
                         <p className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -389,7 +389,7 @@ export default function LandingPage() {
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors dark:border-white/10 dark:bg-white/5">
                         <div className="flex items-center gap-2 text-slate-700">
-                          <Database className="h-4 w-4 text-indigo-600" />
+                          <Database className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                           <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Audit</p>
                         </div>
                         <p className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -398,7 +398,7 @@ export default function LandingPage() {
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white p-4 transition-colors dark:border-white/10 dark:bg-white/5">
                         <div className="flex items-center gap-2 text-slate-700">
-                          <Cpu className="h-4 w-4 text-indigo-600" />
+                          <Cpu className="h-4 w-4 text-indigo-600 dark:text-emerald-400" />
                           <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Performance</p>
                         </div>
                         <p className="mt-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -489,9 +489,9 @@ export default function LandingPage() {
         />
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5">
-            <p className="text-sm font-extrabold text-slate-900">Backend</p>
-            <p className="mt-1 text-sm text-slate-600">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5 dark:border-white/10 dark:bg-white/5 dark:shadow-black/30">
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white">Backend</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               API-first services built for security and realtime collaboration.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -503,13 +503,14 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5">
-            <p className="text-sm font-extrabold text-slate-900">Frontend</p>
-            <p className="mt-1 text-sm text-slate-600">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/5 dark:border-white/10 dark:bg-white/5 dark:shadow-black/30">
+            <p className="text-sm font-extrabold text-slate-900 dark:text-white">Frontend</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               Fast, responsive UI with a clean component-driven architecture.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <StackBadge label="React 19" />
+              <StackBadge label="Redux Toolkit" />
               <StackBadge label="Vite" />
               <StackBadge label="Tailwind CSS" />
               <StackBadge label="React Router" />

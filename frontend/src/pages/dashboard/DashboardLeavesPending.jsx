@@ -44,7 +44,7 @@ export default function DashboardLeavesPending() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {leaves.map((l) => (
-                                <tr key={l.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={l.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4">
                                         <p className="text-sm font-medium text-gray-800">{l.employee_name}</p>
                                         <p className="text-xs text-gray-400 font-mono">{l.employee_code}</p>

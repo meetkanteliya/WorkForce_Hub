@@ -94,7 +94,7 @@ export default function SalaryList() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                                 {currentSalaries.map((s) => (
-                                    <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                                    <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                         <td className="px-6 py-4 text-sm font-medium text-slate-800 dark:text-white">{s.employee_name || `#${s.employee}`}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{s.department_name || '—'}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300 text-right">₹{Number(s.basic_salary).toLocaleString()}</td>

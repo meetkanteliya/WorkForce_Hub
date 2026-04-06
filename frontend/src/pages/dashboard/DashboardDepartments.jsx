@@ -50,7 +50,7 @@ export default function DashboardDepartments() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {(detail.employees || []).map((emp) => (
-                                <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{emp.username}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500 font-mono">{emp.employee_code || '—'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{emp.designation || '—'}</td>

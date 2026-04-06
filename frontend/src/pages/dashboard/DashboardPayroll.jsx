@@ -53,7 +53,7 @@ export default function DashboardPayroll() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {(data?.by_department || []).map((d) => (
-                                <tr key={d.department} className="hover:bg-gray-50 transition-colors">
+                                <tr key={d.department} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{d.department}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600 text-right">{d.headcount}</td>
                                     <td className="px-6 py-4 text-sm font-bold text-gray-800 text-right">₹{Number(d.total).toLocaleString()}</td>
@@ -83,7 +83,7 @@ export default function DashboardPayroll() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {(data?.recent_payouts || []).map((p) => (
-                                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{p.employee_name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{p.department_name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600 text-right">₹{Number(p.basic_salary).toLocaleString()}</td>

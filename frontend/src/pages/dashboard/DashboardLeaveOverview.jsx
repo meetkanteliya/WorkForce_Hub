@@ -53,7 +53,7 @@ export default function DashboardLeaveOverview() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {(data?.by_type || []).map((t) => (
-                                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={t.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                     <td className="px-6 py-4 text-sm font-medium text-gray-800">{t.name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500 text-center">{t.max_days_per_year}</td>
                                     <td className="px-6 py-4 text-sm font-bold text-gray-800 text-center">{t.total_requests}</td>

@@ -28,7 +28,7 @@ const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 export default function Dashboard() {
     const user = useSelector(selectUser);
-    const hasRole = (...roles) => hasRoleUtil(user, ...roles);
+    const hasRole = useCallback((...roles) => hasRoleUtil(user, ...roles), [user]);
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
     const [mockData, setMockData] = useState(null);
@@ -588,7 +588,7 @@ function ManagerDashboard({ team }) {
                                     const isComplete = progressPercent >= 100;
 
                                     return (
-                                        <tr key={member.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                                        <tr key={member.id} className="border-b border-slate-50 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="py-4 px-2">
                                                 <div className="flex flex-col">
                                                     <span className="font-semibold text-[#1A2B3C] flex items-center gap-1.5">
