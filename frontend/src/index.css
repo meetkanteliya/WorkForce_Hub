@@ -212,6 +212,113 @@
         border-color: #334155 !important;
     }
 
+    /* --- Dark Mode Text Overrides (prevent invisible dark text on dark bg) --- */
+    .dark .text-gray-900,
+    .dark .text-gray-800,
+    .dark .text-slate-900,
+    .dark .text-slate-800 {
+        color: #f1f5f9 !important; /* slate-100 */
+    }
+
+    .dark .text-gray-700,
+    .dark .text-slate-700 {
+        color: #cbd5e1 !important; /* slate-300 */
+    }
+
+    .dark .text-gray-600,
+    .dark .text-slate-600 {
+        color: #94a3b8 !important; /* slate-400 */
+    }
+
+    .dark .text-gray-500,
+    .dark .text-slate-500 {
+        color: #64748b !important; /* slate-500 — stays readable */
+    }
+
+    .dark .text-gray-400,
+    .dark .text-slate-400 {
+        color: #64748b !important; /* slate-500 */
+    }
+
+    .dark .text-indigo-600 {
+        color: #818cf8 !important; /* indigo-400 */
+    }
+
+    .dark .text-indigo-700 {
+        color: #a5b4fc !important; /* indigo-300 */
+    }
+
+    .dark .text-green-600 {
+        color: #4ade80 !important; /* green-400 */
+    }
+
+    .dark .text-red-600 {
+        color: #f87171 !important; /* red-400 */
+    }
+
+    .dark .text-red-500 {
+        color: #f87171 !important;
+    }
+
+    .dark .text-yellow-600 {
+        color: #facc15 !important; /* yellow-400 */
+    }
+
+    .dark .text-violet-500 {
+        color: #a78bfa !important; /* violet-400 */
+    }
+
+    /* --- Dark Mode Accent Backgrounds --- */
+    .dark .bg-indigo-50,
+    .dark .bg-indigo-100 {
+        background-color: rgba(99, 102, 241, 0.1) !important;
+        border-color: rgba(99, 102, 241, 0.2) !important;
+    }
+
+    .dark .bg-green-50,
+    .dark .bg-green-100 {
+        background-color: rgba(34, 197, 94, 0.1) !important;
+        border-color: rgba(34, 197, 94, 0.2) !important;
+    }
+
+    .dark .bg-red-50,
+    .dark .bg-red-100 {
+        background-color: rgba(239, 68, 68, 0.12) !important;
+        border-color: rgba(239, 68, 68, 0.2) !important;
+    }
+
+    .dark .bg-yellow-100 {
+        background-color: rgba(250, 204, 29, 0.1) !important;
+        border-color: rgba(250, 204, 29, 0.2) !important;
+    }
+
+    .dark .bg-violet-50,
+    .dark .bg-violet-100 {
+        background-color: rgba(139, 92, 246, 0.1) !important;
+        border-color: rgba(139, 92, 246, 0.2) !important;
+    }
+
+    .dark .bg-slate-50\/80 {
+        background-color: #0F172A !important;
+        border-color: #1E293B !important;
+    }
+
+    /* --- Dark Mode: Placeholder text --- */
+    .dark .placeholder-gray-400::placeholder {
+        color: #475569 !important; /* slate-600 */
+    }
+
+    /* --- Dark Mode: Dividers --- */
+    .dark .divide-gray-100 > :not(:last-child),
+    .dark .divide-gray-50 > :not(:last-child),
+    .dark .divide-slate-100 > :not(:last-child) {
+        border-color: #1E293B !important;
+    }
+
+    .dark .border-b.border-gray-50 {
+        border-color: #1E293B !important;
+    }
+
     /* --- Softer Accents for Eye-Care in Dark Mode --- */
     /* Primary Blue */
     .dark .text-\[\#2563EB\],
