@@ -1,0 +1,50 @@
+C:\Users\om\Desktop\WorkForce_Hub\frontend\src\pages\chat\DepartmentChat.jsx
+  Line 98: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+   96 |         };
+   97 |
+>  98 |         setWs(socket);
+      |         ^^^^^ Avoid calling setState() directly within an effect
+   99 |
+  100 |         return () => {
+  101 |             if (socket) socket.close();
+C:\Users\om\Desktop\WorkForce_Hub\frontend\src\pages\employees\EmployeeList.jsx
+  Line 2: 'useCallback' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.
+C:\Users\om\Desktop\WorkForce_Hub\frontend\src\pages\leaves\LeaveRequestList.jsx
+  Line 69: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  67 |
+  68 |     useEffect(() => {
+> 69 |         setCurrentPage(1);
+     |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  70 |     }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter]);
+  71 |
+  72 |     // ─── Fetch data via Redux ───
+C:\Users\om\Desktop\WorkForce_Hub\frontend\src\pages\payroll\SalaryList.jsx
+  Line 28: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  26 |     useEffect(() => {
+  27 |         dispatch(fetchSalaries({ tab }));
+> 28 |         setCurrentPage(1);
+     |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  29 |     }, [tab, dispatch]);
+  30 |
+  31 |     const totalItems = salaries.length;
