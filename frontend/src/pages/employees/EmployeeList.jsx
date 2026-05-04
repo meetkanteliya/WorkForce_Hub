@@ -192,12 +192,12 @@ export default function EmployeeList() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${
-                                                emp.is_active !== false 
+                                                emp.user?.is_active !== false 
                                                 ? 'bg-emerald-100/80 text-emerald-700 border border-emerald-200/50' 
                                                 : 'bg-slate-100/80 text-slate-700 border border-slate-200/50'
                                             }`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${emp.is_active !== false ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                                                {emp.is_active !== false ? 'Active' : 'Inactive'}
+                                                <span className={`w-1.5 h-1.5 rounded-full ${emp.user?.is_active !== false ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                                                {emp.user?.is_active !== false ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">

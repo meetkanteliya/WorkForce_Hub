@@ -25,12 +25,18 @@ class SalaryViewSet(ModelViewSet):
 
         # Manager can see salaries of own department employees
         if user.role == "manager":
-            return self.queryset.filter(
-                employee__department=user.employee.department
-            )
+            try:
+                return self.queryset.filter(
+                    employee__department=user.employee.department
+                )
+            except Exception:
+                return self.queryset.none()
 
         # Employee can only see their own salary records
-        return self.queryset.filter(employee=user.employee)
+        try:
+            return self.queryset.filter(employee=user.employee)
+        except Exception:
+            return self.queryset.none()
 
     def get_permissions(self):
         # Only Admin can create or update salary records
@@ -68,7 +74,10 @@ class SalaryViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], url_path="my")
     def my(self, request):
         """View own salary records."""
-        salaries = self.queryset.filter(employee=request.user.employee)
+        try:
+            salaries = self.queryset.filter(employee=request.user.employee)
+        except Exception:
+            return Response({"detail": "No employee record linked to your account."}, status=400)
         page = self.paginate_queryset(salaries)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

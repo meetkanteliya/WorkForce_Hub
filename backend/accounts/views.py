@@ -42,10 +42,13 @@ class ChangePasswordView(UpdateAPIView):
 
 
 from .permissions import IsAdminOrHR
+from rest_framework.throttling import ScopedRateThrottle
 
 class AdminResetPasswordView(GenericAPIView):
     serializer_class = AdminResetPasswordSerializer
     permission_classes = [IsAuthenticated, IsAdminOrHR]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'admin_password_reset'
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

@@ -167,28 +167,36 @@ class LeaveRequestViewSet(ModelViewSet):
 
     @action(detail=True, methods=["patch"], permission_classes=[IsManagerOrAbove])
     def reject(self, request, pk=None):
-        leave = self.get_object()
-        was_approved = leave.status == "approved"
+        with transaction.atomic():
+            leave = (
+                LeaveRequest.objects
+                .select_for_update()
+                .select_related("employee__user", "leave_type")
+                .get(pk=pk)
+            )
+            was_approved = leave.status == "approved"
 
-        if leave.status == "rejected":
-            return Response({"status": "already rejected"})
+            if leave.status == "rejected":
+                return Response({"status": "already rejected"})
 
-        leave.status = "rejected"
-        leave.approved_by = request.user
-        leave.save()
+            leave.status = "rejected"
+            leave.approved_by = request.user
+            leave.save()
 
-        # Refund balance only if it was previously approved (deducted)
-        if was_approved:
-            days_requested = (leave.end_date - leave.start_date).days + 1
-            current_year = leave.start_date.year
-            try:
-                balance = LeaveBalance.objects.get(
-                    employee=leave.employee, leave_type=leave.leave_type, year=current_year
-                )
-                balance.used_days = max(0, balance.used_days - days_requested)
-                balance.save()
-            except LeaveBalance.DoesNotExist:
-                pass
+            # Refund balance only if it was previously approved (deducted)
+            if was_approved:
+                days_requested = (leave.end_date - leave.start_date).days + 1
+                current_year = leave.start_date.year
+                try:
+                    balance = (
+                        LeaveBalance.objects
+                        .select_for_update()
+                        .get(employee=leave.employee, leave_type=leave.leave_type, year=current_year)
+                    )
+                    balance.used_days = max(0, balance.used_days - days_requested)
+                    balance.save()
+                except LeaveBalance.DoesNotExist:
+                    pass
 
         AuditLog.objects.create(
             action_type="leave_rejected",

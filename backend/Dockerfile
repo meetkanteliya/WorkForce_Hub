@@ -40,8 +40,8 @@ COPY --from=builder /venv /venv
 # Copy app code
 COPY . .
 
-# 🔥 IMPORTANT: DB folder + permission fix
-RUN mkdir -p /app/db \
+# 🔥 IMPORTANT: DB folder + media folder + permission fix
+RUN mkdir -p /app/db /app/media/profile_pics /app/media/chat_uploads \
     && chown -R nobody:nogroup /app
 
 # Fix entrypoint

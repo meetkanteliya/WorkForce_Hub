@@ -15,8 +15,11 @@ services:
     container_name: workforcehub-backend
     ports:
       - "8000:8000"
-    #env_file:
-    #  - .env
+    env_file:
+      - .env
+    volumes:
+      - backend_media:/app/media
+      - backend_db:/app/db
     depends_on:
       - redis
     restart: unless-stopped
@@ -32,3 +35,5 @@ services:
 
 volumes:
   redis_data:
+  backend_media:
+  backend_db:

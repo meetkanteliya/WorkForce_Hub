@@ -10,7 +10,6 @@ import {
     Building2,
     CalendarCheck,
     CalendarDays,
-    CalendarX2,
     AlertCircle,
     UserPlus,
     Activity,
@@ -20,8 +19,7 @@ import {
     ShieldCheck,
     ChevronRight,
     MinusCircle,
-    RefreshCw,
-    Wifi
+    RefreshCw
 } from 'lucide-react';
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
@@ -305,7 +303,7 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
                                     {(data.recently_added_employees || []).slice(0, 4).map((emp) => (
                                         <div key={emp.id} className="flex items-center gap-3">
                                             <img
-                                                src={emp.profile_picture ? `/media/${emp.profile_picture}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user__username || emp.username || 'User')}&size=56&background=F1F5F9&color=64748B&bold=true&font-size=0.45`}
+                                                src={emp.profile_picture ? (String(emp.profile_picture).startsWith('/media/') ? emp.profile_picture : `/media/${emp.profile_picture}`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.user__username || emp.username || 'User')}&size=56&background=F1F5F9&color=64748B&bold=true&font-size=0.45`}
                                                 alt={emp.user__username || emp.username || 'User'}
                                                 className="w-7 h-7 rounded-full object-cover bg-slate-100 shrink-0"
                                             />
@@ -371,10 +369,7 @@ function AdminDashboard({ data, user, isRefreshing, onRefresh }) {
                     </h2>
                     <div className="grid grid-cols-1 gap-3">
                         <QuickActionLink to="/employees/new" icon={UserPlus} label="Add New Employee" />
-                        <QuickActionLink to="/departments/new" icon={Building2} label="Create Department" />
-                        <QuickActionLink to="/employees" icon={ShieldCheck} label="Manage Roles & Access" />
                         <QuickActionLink to="/leaves" icon={CalendarDays} label="Review Leave Queue" />
-                        <QuickActionLink to="/settings" icon={Settings} label="System Settings" />
                     </div>
                 </div>
 

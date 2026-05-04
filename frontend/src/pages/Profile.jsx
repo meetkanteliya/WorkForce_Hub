@@ -69,7 +69,11 @@ export default function Profile() {
 
     const handleEditToggle = () => {
         if (isEditing) {
-            setFormData(employee);
+            setFormData({
+                ...employee,
+                first_name: employee?.user?.first_name || '',
+                last_name: employee?.user?.last_name || '',
+            });
         }
         setIsEditing(!isEditing);
     };
