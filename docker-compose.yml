@@ -16,7 +16,8 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - backend_media:/app/media
       - backend_db:/app/db
