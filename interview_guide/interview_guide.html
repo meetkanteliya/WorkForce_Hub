@@ -1,0 +1,2957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Software Engineering Interview Preparation Guide</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<button class="print-btn" onclick="window.print()">📄 Save as PDF</button>
+
+<!-- COVER PAGE -->
+<div class="cover-page">
+<h1>Software Engineering<br>Interview Preparation Guide</h1>
+<p class="subtitle">Complete Guide for Junior to Mid-Level Roles</p>
+<div class="tech-list">
+<span class="tech-badge">Python</span>
+<span class="tech-badge">FastAPI</span>
+<span class="tech-badge">Django</span>
+<span class="tech-badge">JavaScript</span>
+<span class="tech-badge">React</span>
+<span class="tech-badge">Redux</span>
+<span class="tech-badge">PostgreSQL</span>
+<span class="tech-badge">MongoDB</span>
+</div>
+<p class="meta">Coding Rounds • Technical Interviews • System Design • DSA • Mock Interviews</p>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="container toc">
+<h2>📋 Table of Contents</h2>
+<ol class="toc-list">
+<li><a href="#python">Python (Core + Advanced)</a></li>
+<li><a href="#fastapi">FastAPI</a></li>
+<li><a href="#django">Django</a></li>
+<li><a href="#javascript">JavaScript (Core + Advanced)</a></li>
+<li><a href="#react">React</a></li>
+<li><a href="#redux">Redux</a></li>
+<li><a href="#postgresql">PostgreSQL</a></li>
+<li><a href="#mongodb">MongoDB</a></li>
+<li><a href="#system-design">System Design (Beginner)</a></li>
+<li><a href="#mock-interview">Mock Interview (50+ Questions)</a></li>
+<li><a href="#dsa">Coding Round (30+ DSA Problems)</a></li>
+<li><a href="#cheatsheets">Cheat Sheets & Quick Revision</a></li>
+</ol>
+</div>
+
+
+<div class="container section" id="python">
+<div class="section-header">
+<h2>01 — Python (Core + Advanced)</h2>
+<p>Data types, OOP, decorators, generators, async, GIL, memory management, and more.</p>
+</div>
+
+<!-- DATA TYPES & MEMORY -->
+<h3>1.1 Data Types, Memory & Mutability</h3>
+
+<div class="card concept">
+<h4>Concept Explanation</h4>
+<p>Python has <strong>mutable</strong> types (list, dict, set) and <strong>immutable</strong> types (int, float, str, tuple, frozenset). Mutable objects can be changed in-place; immutable objects cannot — any "change" creates a new object.</p>
+<p><strong>Why it matters:</strong> Understanding mutability prevents bugs with default arguments, shared references, and unexpected side effects.</p>
+<p><strong>Memory Model:</strong> Python uses <strong>reference counting</strong> + <strong>garbage collector</strong> (cycle detector). Every object has a reference count. When it drops to 0, memory is freed. The GC handles circular references.</p>
+</div>
+
+<table>
+<thead><tr><th>Type</th><th>Mutable?</th><th>Ordered?</th><th>Hashable?</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>int</td><td>No</td><td>N/A</td><td>Yes</td><td><code>x = 42</code></td></tr>
+<tr><td>float</td><td>No</td><td>N/A</td><td>Yes</td><td><code>x = 3.14</code></td></tr>
+<tr><td>str</td><td>No</td><td>Yes</td><td>Yes</td><td><code>s = "hello"</code></td></tr>
+<tr><td>tuple</td><td>No</td><td>Yes</td><td>Yes*</td><td><code>t = (1,2,3)</code></td></tr>
+<tr><td>list</td><td>Yes</td><td>Yes</td><td>No</td><td><code>l = [1,2,3]</code></td></tr>
+<tr><td>dict</td><td>Yes</td><td>Insertion</td><td>No</td><td><code>d = {"a":1}</code></td></tr>
+<tr><td>set</td><td>Yes</td><td>No</td><td>No</td><td><code>s = {1,2,3}</code></td></tr>
+<tr><td>frozenset</td><td>No</td><td>No</td><td>Yes</td><td><code>fs = frozenset([1,2])</code></td></tr>
+</tbody>
+</table>
+
+<h4>Interview Questions & Answers</h4>
+
+<div class="qa">
+<div class="question">What is the difference between <code>is</code> and <code>==</code>?</div>
+<div class="answer"><code>==</code> checks if two objects have the same <strong>value</strong>. <code>is</code> checks if they are the <strong>same object in memory</strong> (same id). Example: <code>[1,2] == [1,2]</code> is True, but <code>[1,2] is [1,2]</code> is False because they are two different list objects.</div>
+</div>
+
+<div class="qa">
+<div class="question">Why should you never use a mutable default argument?</div>
+<div class="answer">Default arguments are evaluated <strong>once</strong> when the function is defined, not each time the function is called. If you use a mutable default like <code>def f(x=[])</code>, all calls share the same list. Use <code>None</code> as default and create inside the function.</div>
+</div>
+
+<pre>
+# BAD - mutable default argument
+def append_to(element, target=[]):
+    target.append(element)
+    return target
+
+print(append_to(1))  # [1]
+print(append_to(2))  # [1, 2] — BUG! Expected [2]
+
+# GOOD - use None
+def append_to(element, target=None):
+    if target is None:
+        target = []
+    target.append(element)
+    return target
+</pre>
+
+<div class="qa">
+<div class="question">What is string interning in Python?</div>
+<div class="answer">Python caches small integers (-5 to 256) and short strings to save memory. So <code>a = 256; b = 256; a is b</code> is True. But <code>a = 257; b = 257; a is b</code> may be False. Never rely on <code>is</code> for value comparison.</div>
+</div>
+
+<div class="qa">
+<div class="question">Explain shallow copy vs deep copy.</div>
+<div class="answer"><strong>Shallow copy</strong> creates a new object but references the same nested objects. <strong>Deep copy</strong> creates completely independent copies of all nested objects. Use <code>copy.copy()</code> for shallow and <code>copy.deepcopy()</code> for deep.</div>
+</div>
+
+<pre>
+import copy
+
+original = [[1, 2], [3, 4]]
+shallow = copy.copy(original)
+deep = copy.deepcopy(original)
+
+original[0][0] = 99
+print(shallow[0][0])  # 99 — affected!
+print(deep[0][0])     # 1  — independent
+</pre>
+
+<!-- OOP -->
+<h3>1.2 Object-Oriented Programming (Deep)</h3>
+
+<div class="card concept">
+<h4>Core OOP Concepts</h4>
+<ul>
+<li><strong>Encapsulation:</strong> Bundle data + methods. Use <code>_private</code> (convention) and <code>__mangled</code> (name mangling).</li>
+<li><strong>Inheritance:</strong> Child class inherits from parent. Python supports multiple inheritance.</li>
+<li><strong>Polymorphism:</strong> Same interface, different behavior. Duck typing: "If it quacks like a duck..."</li>
+<li><strong>Abstraction:</strong> Hide complexity. Use <code>abc.ABC</code> and <code>@abstractmethod</code>.</li>
+</ul>
+</div>
+
+<pre>
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self):
+        pass
+    
+    @abstractmethod
+    def perimeter(self):
+        pass
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self._width = width    # protected by convention
+        self._height = height
+    
+    @property
+    def width(self):
+        return self._width
+    
+    @width.setter
+    def width(self, value):
+        if value <= 0:
+            raise ValueError("Width must be positive")
+        self._width = value
+    
+    def area(self):
+        return self._width * self._height
+    
+    def perimeter(self):
+        return 2 * (self._width + self._height)
+
+class Circle(Shape):
+    def __init__(self, radius):
+        self.__radius = radius  # name mangling: _Circle__radius
+    
+    def area(self):
+        return 3.14159 * self.__radius ** 2
+    
+    def perimeter(self):
+        return 2 * 3.14159 * self.__radius
+</pre>
+
+<div class="qa">
+<div class="question">What is MRO (Method Resolution Order)?</div>
+<div class="answer">MRO determines the order Python searches for methods in multiple inheritance. Python uses the <strong>C3 linearization</strong> algorithm. You can see it with <code>ClassName.__mro__</code> or <code>ClassName.mro()</code>. It goes left-to-right, depth-first, but skips duplicates.</div>
+</div>
+
+<div class="qa">
+<div class="question">Difference between <code>@staticmethod</code> and <code>@classmethod</code>?</div>
+<div class="answer"><code>@staticmethod</code> takes no implicit first argument — it is just a regular function inside a class. <code>@classmethod</code> takes <code>cls</code> as first argument — it can access/modify class state. Use classmethod for factory methods.</div>
+</div>
+
+<pre>
+class Employee:
+    raise_percent = 1.05
+    
+    def __init__(self, name, salary):
+        self.name = name
+        self.salary = salary
+    
+    def apply_raise(self):
+        self.salary *= self.raise_percent
+    
+    @classmethod
+    def set_raise_percent(cls, percent):
+        cls.raise_percent = percent
+    
+    @classmethod
+    def from_string(cls, emp_str):  # Factory method
+        name, salary = emp_str.split('-')
+        return cls(name, int(salary))
+    
+    @staticmethod
+    def is_workday(day):
+        return day.weekday() < 5
+
+# Usage
+emp = Employee.from_string("John-50000")
+Employee.set_raise_percent(1.10)
+</pre>
+
+<div class="qa">
+<div class="question">What are dunder/magic methods? Name the most important ones.</div>
+<div class="answer">Dunder methods (double underscore) let you define how objects behave with built-in operations. Key ones: <code>__init__</code> (constructor), <code>__str__</code> (print), <code>__repr__</code> (debug), <code>__len__</code>, <code>__getitem__</code>, <code>__eq__</code>, <code>__hash__</code>, <code>__enter__/__exit__</code> (context manager), <code>__call__</code> (make object callable).</div>
+</div>
+
+<!-- DECORATORS, GENERATORS, ITERATORS -->
+<h3>1.3 Decorators, Generators & Iterators</h3>
+
+<div class="card concept">
+<h4>Decorators</h4>
+<p>A decorator is a function that takes another function, adds functionality, and returns it. They use the <code>@</code> syntax. Used for logging, auth, caching, timing, etc.</p>
+</div>
+
+<pre>
+import functools, time
+
+# Basic decorator with functools.wraps
+def timer(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed = time.time() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+# Decorator with arguments
+def retry(max_attempts=3):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts - 1:
+                        raise
+                    print(f"Attempt {attempt+1} failed: {e}")
+        return wrapper
+    return decorator
+
+@timer
+@retry(max_attempts=3)
+def fetch_data(url):
+    # some operation
+    pass
+
+# Class-based decorator
+class CountCalls:
+    def __init__(self, func):
+        functools.update_wrapper(self, func)
+        self.func = func
+        self.count = 0
+    
+    def __call__(self, *args, **kwargs):
+        self.count += 1
+        print(f"Call #{self.count}")
+        return self.func(*args, **kwargs)
+</pre>
+
+<div class="card concept">
+<h4>Generators & Iterators</h4>
+<p><strong>Iterator:</strong> Any object with <code>__iter__</code> and <code>__next__</code>. <strong>Generator:</strong> A function with <code>yield</code> — it automatically creates an iterator. Generators are <strong>lazy</strong> — they produce values one at a time, saving memory.</p>
+</div>
+
+<pre>
+# Generator function
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        yield a
+        a, b = b, a + b
+
+# Generator expression (like list comprehension but lazy)
+squares = (x**2 for x in range(1000000))  # uses almost no memory
+
+# Custom iterator class
+class Countdown:
+    def __init__(self, start):
+        self.start = start
+    
+    def __iter__(self):
+        self.current = self.start
+        return self
+    
+    def __next__(self):
+        if self.current <= 0:
+            raise StopIteration
+        self.current -= 1
+        return self.current + 1
+
+# yield from — delegate to sub-generator
+def chain(*iterables):
+    for it in iterables:
+        yield from it
+
+list(chain([1,2], [3,4], [5,6]))  # [1,2,3,4,5,6]
+</pre>
+
+<!-- MULTITHREADING vs MULTIPROCESSING -->
+<h3>1.4 Multithreading vs Multiprocessing</h3>
+
+<table>
+<thead><tr><th>Feature</th><th>Threading</th><th>Multiprocessing</th><th>Asyncio</th></tr></thead>
+<tbody>
+<tr><td>Best for</td><td>I/O-bound tasks</td><td>CPU-bound tasks</td><td>I/O-bound (many connections)</td></tr>
+<tr><td>GIL impact</td><td>Limited by GIL</td><td>Bypasses GIL</td><td>Single thread, no GIL issue</td></tr>
+<tr><td>Memory</td><td>Shared</td><td>Separate per process</td><td>Shared</td></tr>
+<tr><td>Overhead</td><td>Low</td><td>High</td><td>Very low</td></tr>
+<tr><td>Communication</td><td>Easy (shared mem)</td><td>Pipes/Queues</td><td>Awaitable coroutines</td></tr>
+</tbody>
+</table>
+
+<pre>
+# Threading — good for I/O
+import threading
+
+def download(url):
+    print(f"Downloading {url}")
+
+threads = [threading.Thread(target=download, args=(url,))
+           for url in urls]
+for t in threads: t.start()
+for t in threads: t.join()
+
+# Multiprocessing — good for CPU
+from multiprocessing import Pool
+
+def heavy_computation(n):
+    return sum(i*i for i in range(n))
+
+with Pool(4) as pool:
+    results = pool.map(heavy_computation, [10**6]*4)
+
+# Asyncio — good for many I/O operations
+import asyncio, aiohttp
+
+async def fetch(session, url):
+    async with session.get(url) as response:
+        return await response.text()
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch(session, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+
+asyncio.run(main())
+</pre>
+
+<div class="qa">
+<div class="question">What is the GIL and why does it matter?</div>
+<div class="answer">The <strong>Global Interpreter Lock (GIL)</strong> is a mutex in CPython that allows only one thread to execute Python bytecode at a time. This means multithreading does NOT speed up CPU-bound tasks. For CPU-bound work, use <code>multiprocessing</code> (separate processes, each with its own GIL) or use libraries like NumPy that release the GIL during computation.</div>
+</div>
+
+<!-- EXCEPTION HANDLING -->
+<h3>1.5 Exception Handling (Advanced)</h3>
+
+<pre>
+# Complete exception handling pattern
+class InsufficientFundsError(Exception):
+    def __init__(self, balance, amount):
+        self.balance = balance
+        self.amount = amount
+        super().__init__(
+            f"Cannot withdraw {amount}. Balance: {balance}"
+        )
+
+class BankAccount:
+    def __init__(self, balance):
+        self.balance = balance
+    
+    def withdraw(self, amount):
+        if amount > self.balance:
+            raise InsufficientFundsError(self.balance, amount)
+        self.balance -= amount
+        return self.balance
+
+# Exception chaining
+try:
+    account.withdraw(1000)
+except InsufficientFundsError as e:
+    raise RuntimeError("Transaction failed") from e
+
+# Full try/except/else/finally
+try:
+    result = risky_operation()
+except ValueError as e:
+    print(f"Bad value: {e}")
+except (TypeError, KeyError) as e:
+    print(f"Type/Key error: {e}")
+except Exception as e:
+    print(f"Unexpected: {e}")
+    raise  # re-raise after logging
+else:
+    print("Success — no exception occurred")
+    process(result)
+finally:
+    cleanup()  # ALWAYS runs
+</pre>
+
+<!-- CODING PROBLEMS -->
+<h3>1.6 Python Coding Problems</h3>
+
+<h4><span class="badge easy">Easy</span> Find duplicates in a list</h4>
+<pre>
+def find_duplicates(lst):
+    seen = set()
+    duplicates = set()
+    for item in lst:
+        if item in seen:
+            duplicates.add(item)
+        seen.add(item)
+    return list(duplicates)
+
+# Time: O(n), Space: O(n)
+print(find_duplicates([1,2,3,2,4,3,5]))  # [2, 3]
+</pre>
+
+<h4><span class="badge medium">Medium</span> Group anagrams</h4>
+<pre>
+from collections import defaultdict
+
+def group_anagrams(strs):
+    groups = defaultdict(list)
+    for s in strs:
+        key = tuple(sorted(s))
+        groups[key].append(s)
+    return list(groups.values())
+
+# Time: O(n * k log k) where k = max string length
+print(group_anagrams(["eat","tea","tan","ate","nat","bat"]))
+# [["eat","tea","ate"], ["tan","nat"], ["bat"]]
+</pre>
+
+<h4><span class="badge hard">Hard</span> LRU Cache from scratch</h4>
+<pre>
+from collections import OrderedDict
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cache = OrderedDict()
+        self.capacity = capacity
+    
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        self.cache.move_to_end(key)
+        return self.cache[key]
+    
+    def put(self, key, value):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)  # Remove oldest
+</pre>
+
+<!-- COMMON MISTAKES -->
+<div class="card warning">
+<h4>⚠️ Common Mistakes</h4>
+<ul>
+<li>Using mutable default arguments (<code>def f(x=[])</code>)</li>
+<li>Confusing <code>is</code> vs <code>==</code></li>
+<li>Not using <code>functools.wraps</code> in decorators (loses function metadata)</li>
+<li>Catching bare <code>except:</code> instead of <code>except Exception:</code></li>
+<li>Modifying a list while iterating over it</li>
+<li>Using threads for CPU-bound work (GIL blocks it)</li>
+</ul>
+</div>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Always mention the GIL when asked about threading</li>
+<li>Know the time complexity of list vs dict vs set operations</li>
+<li>Be ready to write a decorator from scratch</li>
+<li>Explain generators in terms of memory efficiency</li>
+<li>Use <code>collections</code> module (Counter, defaultdict, deque) — interviewers love it</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="fastapi">
+<div class="section-header">
+<h2>02 — FastAPI</h2>
+<p>Routing, dependency injection, Pydantic, authentication, async, and real-world API design.</p>
+</div>
+
+<h3>2.1 Core Concepts & Routing</h3>
+
+<div class="card concept">
+<h4>What is FastAPI?</h4>
+<p>FastAPI is a modern, high-performance Python web framework for building APIs. It is built on <strong>Starlette</strong> (for web parts) and <strong>Pydantic</strong> (for data validation). It is one of the fastest Python frameworks, comparable to Node.js and Go.</p>
+<p><strong>Key advantages:</strong> Automatic docs (Swagger/ReDoc), type hints for validation, async support, dependency injection.</p>
+</div>
+
+<pre>
+from fastapi import FastAPI, HTTPException, Depends, Query, Path
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
+from enum import Enum
+
+app = FastAPI(title="My API", version="1.0.0")
+
+# Path parameters with validation
+@app.get("/users/{user_id}")
+async def get_user(user_id: int = Path(..., gt=0, description="User ID")):
+    return {"user_id": user_id}
+
+# Query parameters
+@app.get("/items/")
+async def list_items(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, le=100),
+    search: Optional[str] = None
+):
+    return {"skip": skip, "limit": limit, "search": search}
+
+# Enum for fixed choices
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+@app.get("/products/")
+async def list_products(sort: SortOrder = SortOrder.asc):
+    return {"sort_order": sort}
+</pre>
+
+<h3>2.2 Pydantic Models & Validation</h3>
+
+<pre>
+from pydantic import BaseModel, Field, validator, EmailStr
+from datetime import datetime
+from typing import Optional, List
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    age: int = Field(..., gt=0, lt=150)
+    tags: List[str] = []
+    
+    @validator('username')
+    def username_alphanumeric(cls, v):
+        if not v.isalnum():
+            raise ValueError('must be alphanumeric')
+        return v.lower()
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "username": "johndoe",
+                "email": "john@example.com",
+                "password": "securepass123",
+                "age": 25,
+                "tags": ["developer"]
+            }
+        }
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    created_at: datetime
+    
+    class Config:
+        orm_mode = True  # allows from_orm() for SQLAlchemy models
+
+@app.post("/users/", response_model=UserResponse, status_code=201)
+async def create_user(user: UserCreate):
+    # user data is already validated by Pydantic
+    return save_to_db(user)
+</pre>
+
+<h3>2.3 Dependency Injection</h3>
+
+<pre>
+from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+
+# Simple dependency
+async def get_db():
+    db = SessionLocal()
+    try:
+        yield db  # cleanup after request
+    finally:
+        db.close()
+
+# Auth dependency
+security = HTTPBearer()
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user = await get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+# Role-based dependency
+def require_role(required_role: str):
+    async def role_checker(user = Depends(get_current_user)):
+        if user.role != required_role:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user
+    return role_checker
+
+@app.get("/admin/dashboard")
+async def admin_dashboard(user = Depends(require_role("admin"))):
+    return {"message": f"Welcome admin {user.username}"}
+
+@app.get("/users/me")
+async def read_current_user(user = Depends(get_current_user)):
+    return user
+</pre>
+
+<h3>2.4 Async vs Sync in FastAPI</h3>
+
+<div class="card concept">
+<p><strong>Rule of thumb:</strong> Use <code>async def</code> when your endpoint does I/O with async libraries (aiohttp, databases, etc.). Use regular <code>def</code> when doing blocking I/O (requests, time.sleep) — FastAPI will run it in a thread pool automatically.</p>
+</div>
+
+<table>
+<thead><tr><th>Scenario</th><th>Use</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Async DB query (databases lib)</td><td><code>async def</code></td><td>Non-blocking I/O</td></tr>
+<tr><td>SQLAlchemy sync query</td><td><code>def</code></td><td>Blocking — runs in threadpool</td></tr>
+<tr><td>CPU-heavy computation</td><td><code>def</code></td><td>Runs in threadpool, won't block event loop</td></tr>
+<tr><td>External async API call</td><td><code>async def</code></td><td>Use aiohttp, non-blocking</td></tr>
+</tbody>
+</table>
+
+<h3>2.5 Interview Questions & Answers</h3>
+
+<div class="qa">
+<div class="question">How does FastAPI achieve such high performance?</div>
+<div class="answer">FastAPI uses <strong>Starlette</strong> (ASGI framework) under the hood, which supports async/await natively. It uses <strong>uvicorn</strong> (ASGI server built on uvloop), which is extremely fast. Pydantic does data validation in compiled Rust code (v2). This combination makes it comparable to Node.js/Go.</div>
+</div>
+
+<div class="qa">
+<div class="question">What is the difference between FastAPI and Flask?</div>
+<div class="answer">FastAPI: async-native, auto-validation via Pydantic, auto-generated OpenAPI docs, type hints required, ASGI server. Flask: synchronous by default, no built-in validation, manual docs, WSGI server. FastAPI is much faster and more modern. Flask has a larger ecosystem and is simpler for beginners.</div>
+</div>
+
+<div class="qa">
+<div class="question">Explain middleware in FastAPI.</div>
+<div class="answer">Middleware runs before every request and after every response. Used for logging, CORS, auth, timing. FastAPI uses Starlette middleware. You can add with <code>@app.middleware("http")</code> or <code>app.add_middleware()</code>.</div>
+</div>
+
+<pre>
+import time
+from fastapi.middleware.cors import CORSMiddleware
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Custom timing middleware
+@app.middleware("http")
+async def add_timing_header(request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    response.headers["X-Process-Time"] = str(duration)
+    return response
+</pre>
+
+<div class="card warning">
+<h4>⚠️ Common Mistakes</h4>
+<ul>
+<li>Using <code>async def</code> with blocking code (blocks the entire event loop)</li>
+<li>Not using <code>response_model</code> to filter sensitive fields from response</li>
+<li>Forgetting to close DB sessions (use <code>yield</code> in dependencies)</li>
+<li>Not handling validation errors with custom exception handlers</li>
+</ul>
+</div>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Know the difference between ASGI and WSGI</li>
+<li>Be ready to explain dependency injection with a real example</li>
+<li>Mention Pydantic v2's Rust core for performance questions</li>
+<li>Know how to structure a large FastAPI project (routers, dependencies, models)</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="django">
+<div class="section-header">
+<h2>03 — Django</h2>
+<p>MVT architecture, ORM, middleware, authentication, signals, and Django vs FastAPI comparison.</p>
+</div>
+
+<h3>3.1 MVT Architecture</h3>
+
+<div class="card concept">
+<p><strong>Model:</strong> Defines data structure (database tables). <strong>View:</strong> Handles business logic and returns responses. <strong>Template:</strong> HTML rendering (presentation layer). Django follows MVT, not MVC. The "Controller" part is handled by Django itself (URL routing).</p>
+</div>
+
+<table>
+<thead><tr><th>MVC</th><th>Django MVT</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td>Model</td><td>Model</td><td>Database / data logic</td></tr>
+<tr><td>View</td><td>Template</td><td>What user sees (HTML)</td></tr>
+<tr><td>Controller</td><td>View</td><td>Business logic + routing</td></tr>
+</tbody>
+</table>
+
+<h3>3.2 ORM Deep Dive</h3>
+
+<pre>
+from django.db import models
+
+class Author(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.name
+
+class Book(models.Model):
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name='books')
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    published = models.DateField()
+    tags = models.ManyToManyField('Tag', blank=True)
+
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+# ===== QUERYSETS =====
+# Lazy evaluation — query runs only when you access the data
+books = Book.objects.filter(price__gte=20)  # not executed yet
+for b in books:  # NOW it executes
+    print(b.title)
+
+# Chaining
+expensive_recent = Book.objects.filter(
+    price__gte=50
+).exclude(
+    author__name="Unknown"
+).order_by('-published')[:10]
+
+# Aggregation
+from django.db.models import Avg, Count, Sum, Q, F
+
+Book.objects.aggregate(avg_price=Avg('price'))
+# {'avg_price': 29.99}
+
+# Annotation — add computed fields
+authors = Author.objects.annotate(
+    book_count=Count('books'),
+    avg_price=Avg('books__price')
+).filter(book_count__gt=5)
+
+# F expressions — reference model fields in queries
+Book.objects.filter(price__gt=F('author__books__price'))
+Book.objects.update(price=F('price') * 1.10)  # 10% price increase
+
+# Q objects — complex lookups (OR, AND, NOT)
+Book.objects.filter(
+    Q(price__lt=10) | Q(title__icontains="python")
+)
+
+# select_related (ForeignKey — JOIN) vs prefetch_related (M2M — 2 queries)
+books = Book.objects.select_related('author').all()  # 1 query with JOIN
+books = Book.objects.prefetch_related('tags').all()   # 2 queries
+</pre>
+
+<div class="qa">
+<div class="question">What is the N+1 query problem and how do you fix it in Django?</div>
+<div class="answer">N+1 happens when you fetch N objects, then for each object you make another query for related data (1 + N queries total). Fix: use <code>select_related()</code> for ForeignKey/OneToOne (SQL JOIN) or <code>prefetch_related()</code> for ManyToMany/reverse FK (2 queries with Python-side joining).</div>
+</div>
+
+<h3>3.3 Middleware</h3>
+
+<pre>
+import time
+
+class RequestTimingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        start = time.time()
+        response = self.get_response(request)
+        duration = time.time() - start
+        response['X-Request-Duration'] = f"{duration:.4f}s"
+        return response
+    
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        """Called just before Django calls the view."""
+        pass
+    
+    def process_exception(self, request, exception):
+        """Called when a view raises an exception."""
+        pass
+
+# settings.py — order matters!
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'myapp.middleware.RequestTimingMiddleware',  # custom
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+]
+</pre>
+
+<h3>3.4 Signals</h3>
+
+<pre>
+from django.db.models.signals import post_save, pre_delete
+from django.dispatch import receiver
+from django.contrib.auth.models import User
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        Profile.objects.create(user=instance)
+
+@receiver(pre_delete, sender=Book)
+def log_book_deletion(sender, instance, **kwargs):
+    AuditLog.objects.create(
+        action="DELETE",
+        model="Book",
+        object_id=instance.id,
+        details=f"Deleted: {instance.title}"
+    )
+</pre>
+
+<h3>3.5 Django vs FastAPI</h3>
+
+<table>
+<thead><tr><th>Feature</th><th>Django</th><th>FastAPI</th></tr></thead>
+<tbody>
+<tr><td>Type</td><td>Full-stack (batteries included)</td><td>API-only (micro)</td></tr>
+<tr><td>ORM</td><td>Built-in, powerful</td><td>None (use SQLAlchemy)</td></tr>
+<tr><td>Admin Panel</td><td>Built-in</td><td>None</td></tr>
+<tr><td>Async</td><td>Partial (Django 4.1+)</td><td>Native async</td></tr>
+<tr><td>Performance</td><td>Moderate</td><td>Very high</td></tr>
+<tr><td>Validation</td><td>Forms/Serializers</td><td>Pydantic (automatic)</td></tr>
+<tr><td>API Docs</td><td>Manual (DRF + drf-spectacular)</td><td>Auto-generated</td></tr>
+<tr><td>Best for</td><td>Full web apps, CMS, e-commerce</td><td>Microservices, APIs</td></tr>
+</tbody>
+</table>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Know when to use Django vs FastAPI — this is a very common comparison question</li>
+<li>Always mention <code>select_related</code> and <code>prefetch_related</code> for optimization</li>
+<li>Understand middleware execution order (top-down for request, bottom-up for response)</li>
+<li>Be ready to explain the request-response lifecycle in Django</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="javascript">
+<div class="section-header">
+<h2>04 — JavaScript (Core + Advanced)</h2>
+<p>Execution context, closures, hoisting, event loop, promises, async/await, prototypes.</p>
+</div>
+
+<h3>4.1 Execution Context & Hoisting</h3>
+
+<div class="card concept">
+<p><strong>Execution Context</strong> is the environment where JavaScript code runs. There are 3 types: <strong>Global</strong> (default), <strong>Function</strong> (created on each function call), and <strong>Eval</strong>. Each context has two phases:</p>
+<ol>
+<li><strong>Creation Phase:</strong> Memory is allocated. <code>var</code> declarations are hoisted with value <code>undefined</code>. <code>let/const</code> are hoisted but in a "Temporal Dead Zone" (TDZ). Function declarations are hoisted completely.</li>
+<li><strong>Execution Phase:</strong> Code runs line by line, values are assigned.</li>
+</ol>
+</div>
+
+<pre>
+console.log(a);        // undefined (var is hoisted with undefined)
+console.log(b);        // ReferenceError (let is in TDZ)
+console.log(myFunc()); // "hello" (function declaration is fully hoisted)
+
+var a = 10;
+let b = 20;
+
+function myFunc() { return "hello"; }
+
+// Function expression is NOT fully hoisted
+console.log(myExpr()); // TypeError: myExpr is not a function
+var myExpr = function() { return "hi"; };
+</pre>
+
+<h3>4.2 Closures</h3>
+
+<div class="card concept">
+<p>A <strong>closure</strong> is a function that remembers variables from its outer scope even after the outer function has returned. Every function in JavaScript forms a closure.</p>
+</div>
+
+<pre>
+// Basic closure
+function createCounter() {
+    let count = 0;  // enclosed variable
+    return {
+        increment: () => ++count,
+        decrement: () => --count,
+        getCount: () => count
+    };
+}
+const counter = createCounter();
+counter.increment(); // 1
+counter.increment(); // 2
+counter.getCount();  // 2
+// 'count' is private — cannot be accessed directly
+
+// Classic interview problem: closure in a loop
+for (var i = 0; i < 3; i++) {
+    setTimeout(() => console.log(i), 100);
+}
+// Prints: 3, 3, 3 (var is function-scoped, shared)
+
+// Fix 1: use let (block-scoped)
+for (let i = 0; i < 3; i++) {
+    setTimeout(() => console.log(i), 100);
+}
+// Prints: 0, 1, 2
+
+// Fix 2: IIFE (old way)
+for (var i = 0; i < 3; i++) {
+    (function(j) {
+        setTimeout(() => console.log(j), 100);
+    })(i);
+}
+// Prints: 0, 1, 2
+
+// Practical closure: function factory
+function multiplier(factor) {
+    return (number) => number * factor;
+}
+const double = multiplier(2);
+const triple = multiplier(3);
+double(5);  // 10
+triple(5);  // 15
+</pre>
+
+<h3>4.3 Event Loop (VERY IMPORTANT)</h3>
+
+<div class="card concept">
+<p>JavaScript is <strong>single-threaded</strong> but non-blocking via the <strong>event loop</strong>. The event loop continuously checks: Call Stack → Microtask Queue → Macrotask Queue.</p>
+<ul>
+<li><strong>Call Stack:</strong> Executes synchronous code</li>
+<li><strong>Microtask Queue:</strong> Promise callbacks (<code>.then</code>), <code>queueMicrotask</code>, <code>MutationObserver</code></li>
+<li><strong>Macrotask Queue:</strong> <code>setTimeout</code>, <code>setInterval</code>, I/O, UI rendering</li>
+</ul>
+<p><strong>Priority:</strong> Call Stack → ALL Microtasks → ONE Macrotask → ALL Microtasks → ...</p>
+</div>
+
+<pre>
+console.log("1");                           // Sync → Call Stack
+
+setTimeout(() => console.log("2"), 0);      // Macrotask Queue
+
+Promise.resolve().then(() => console.log("3")); // Microtask Queue
+
+console.log("4");                           // Sync → Call Stack
+
+// Output: 1, 4, 3, 2
+// Explanation:
+// 1. "1" — sync, runs immediately
+// 2. setTimeout → goes to Macrotask Queue
+// 3. Promise.then → goes to Microtask Queue
+// 4. "4" — sync, runs immediately
+// 5. Call stack empty → check Microtasks → "3"
+// 6. Microtasks empty → check Macrotasks → "2"
+
+// More complex example
+console.log("start");
+
+setTimeout(() => {
+    console.log("timeout 1");
+    Promise.resolve().then(() => console.log("promise inside timeout"));
+}, 0);
+
+Promise.resolve().then(() => {
+    console.log("promise 1");
+    setTimeout(() => console.log("timeout inside promise"), 0);
+});
+
+console.log("end");
+
+// Output: start, end, promise 1, timeout 1, promise inside timeout, timeout inside promise
+</pre>
+
+<h3>4.4 Promises & Async/Await</h3>
+
+<pre>
+// Promise states: pending → fulfilled OR rejected
+const fetchData = (url) => {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (url) resolve({ data: "success" });
+            else reject(new Error("No URL provided"));
+        }, 1000);
+    });
+};
+
+// Promise chaining
+fetchData("/api/users")
+    .then(result => fetchData(`/api/users/${result.id}`))
+    .then(user => console.log(user))
+    .catch(err => console.error(err))
+    .finally(() => console.log("Done"));
+
+// Promise.all — wait for ALL (fails fast on any rejection)
+const [users, posts, comments] = await Promise.all([
+    fetch("/users"),
+    fetch("/posts"),
+    fetch("/comments")
+]);
+
+// Promise.allSettled — wait for ALL (never rejects)
+const results = await Promise.allSettled([
+    fetch("/api1"),
+    fetch("/api2"),  // even if this fails
+    fetch("/api3")
+]);
+// results: [{status:"fulfilled", value:...}, {status:"rejected", reason:...}, ...]
+
+// Promise.race — first to settle wins
+const result = await Promise.race([
+    fetch("/api"),
+    new Promise((_, reject) => setTimeout(() => reject("Timeout"), 5000))
+]);
+
+// Async/Await — syntactic sugar over Promises
+async function getUserPosts(userId) {
+    try {
+        const user = await fetch(`/users/${userId}`);
+        const userData = await user.json();
+        const posts = await fetch(`/posts?userId=${userData.id}`);
+        return await posts.json();
+    } catch (error) {
+        console.error("Failed:", error);
+        throw error;
+    }
+}
+</pre>
+
+<h3>4.5 Prototypes & Inheritance</h3>
+
+<pre>
+// Prototype chain
+function Person(name) {
+    this.name = name;
+}
+Person.prototype.greet = function() {
+    return `Hi, I'm ${this.name}`;
+};
+
+const john = new Person("John");
+john.greet(); // "Hi, I'm John"
+// john → Person.prototype → Object.prototype → null
+
+// ES6 class (syntactic sugar over prototypes)
+class Animal {
+    #sound; // private field
+    
+    constructor(name, sound) {
+        this.name = name;
+        this.#sound = sound;
+    }
+    
+    speak() {
+        return `${this.name} says ${this.#sound}`;
+    }
+    
+    static create(name, sound) {
+        return new Animal(name, sound);
+    }
+}
+
+class Dog extends Animal {
+    constructor(name) {
+        super(name, "Woof");
+    }
+    
+    fetch(item) {
+        return `${this.name} fetches ${item}`;
+    }
+}
+
+// this keyword
+const obj = {
+    name: "Alice",
+    regular: function() { return this.name; },     // "Alice"
+    arrow: () => this.name,                          // undefined (inherits outer this)
+};
+
+// bind, call, apply
+function introduce(greeting) {
+    return `${greeting}, I'm ${this.name}`;
+}
+const user = { name: "Bob" };
+introduce.call(user, "Hello");      // "Hello, I'm Bob"
+introduce.apply(user, ["Hello"]);   // "Hello, I'm Bob"
+const bound = introduce.bind(user);
+bound("Hello");                     // "Hello, I'm Bob"
+</pre>
+
+<h3>4.6 Interview Questions</h3>
+
+<div class="qa">
+<div class="question">What is the difference between <code>==</code> and <code>===</code>?</div>
+<div class="answer"><code>==</code> compares with type coercion (converts types before comparing). <code>===</code> compares without type coercion (strict equality). Always use <code>===</code>. Example: <code>"5" == 5</code> is true, <code>"5" === 5</code> is false.</div>
+</div>
+
+<div class="qa">
+<div class="question">What is the difference between <code>null</code> and <code>undefined</code>?</div>
+<div class="answer"><code>undefined</code> means a variable is declared but not assigned. <code>null</code> is an intentional absence of value (assigned by programmer). <code>typeof undefined</code> is "undefined". <code>typeof null</code> is "object" (JS bug).</div>
+</div>
+
+<div class="qa">
+<div class="question">Explain <code>var</code> vs <code>let</code> vs <code>const</code>.</div>
+<div class="answer"><code>var</code>: function-scoped, hoisted with <code>undefined</code>, can be redeclared. <code>let</code>: block-scoped, hoisted but in TDZ, cannot be redeclared. <code>const</code>: like <code>let</code> but cannot be reassigned (but object properties can still be mutated).</div>
+</div>
+
+<div class="card warning">
+<h4>⚠️ Common Mistakes</h4>
+<ul>
+<li>Not understanding <code>this</code> in arrow vs regular functions</li>
+<li>Using <code>==</code> instead of <code>===</code></li>
+<li>Not knowing the event loop order (microtasks before macrotasks)</li>
+<li>Forgetting that <code>const</code> objects can still be mutated</li>
+<li>Confusing closure behavior in loops with <code>var</code></li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="react">
+<div class="section-header">
+<h2>05 — React</h2>
+<p>Functional components, hooks, lifecycle, performance optimization, and architecture.</p>
+</div>
+
+<h3>5.1 Functional Components & JSX</h3>
+
+<pre>
+// Functional component with props
+function UserCard({ name, email, role = "user", onDelete }) {
+    return (
+        &lt;div className="user-card"&gt;
+            &lt;h3&gt;{name}&lt;/h3&gt;
+            &lt;p&gt;{email}&lt;/p&gt;
+            &lt;span className={`badge badge-${role}`}&gt;{role}&lt;/span&gt;
+            &lt;button onClick={() =&gt; onDelete(name)}&gt;Delete&lt;/button&gt;
+        &lt;/div&gt;
+    );
+}
+
+// Conditional rendering
+function Dashboard({ user, isLoading, error }) {
+    if (isLoading) return &lt;Spinner /&gt;;
+    if (error) return &lt;ErrorMessage error={error} /&gt;;
+    if (!user) return &lt;p&gt;No user found&lt;/p&gt;;
+    
+    return (
+        &lt;div&gt;
+            &lt;h1&gt;Welcome, {user.name}&lt;/h1&gt;
+            {user.isAdmin && &lt;AdminPanel /&gt;}
+            {user.notifications.length &gt; 0 
+                ? &lt;NotificationList items={user.notifications} /&gt;
+                : &lt;p&gt;No notifications&lt;/p&gt;
+            }
+        &lt;/div&gt;
+    );
+}
+
+// List rendering
+function TodoList({ todos }) {
+    return (
+        &lt;ul&gt;
+            {todos.map(todo =&gt; (
+                &lt;li key={todo.id}&gt;{todo.text}&lt;/li&gt;
+            ))}
+        &lt;/ul&gt;
+    );
+}
+// IMPORTANT: key must be unique and stable (NOT array index for dynamic lists)
+</pre>
+
+<h3>5.2 Hooks Deep Dive</h3>
+
+<pre>
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+
+// ===== useState =====
+function Counter() {
+    const [count, setCount] = useState(0);
+    
+    // Functional update (when new state depends on previous)
+    const increment = () =&gt; setCount(prev =&gt; prev + 1);
+    
+    // Lazy initialization (expensive initial value)
+    const [data, setData] = useState(() =&gt; computeExpensiveValue());
+    
+    return &lt;button onClick={increment}&gt;{count}&lt;/button&gt;;
+}
+
+// ===== useEffect =====
+function UserProfile({ userId }) {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() =&gt; {
+        let cancelled = false; // prevent state update on unmounted component
+        
+        async function fetchUser() {
+            setLoading(true);
+            try {
+                const res = await fetch(\`/api/users/\${userId}\`);
+                const data = await res.json();
+                if (!cancelled) {
+                    setUser(data);
+                    setLoading(false);
+                }
+            } catch (err) {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        fetchUser();
+        
+        return () =&gt; { cancelled = true; }; // cleanup
+    }, [userId]); // runs when userId changes
+    
+    // No dependency array → runs every render
+    // Empty array [] → runs once on mount
+    // [dep1, dep2] → runs when dep1 or dep2 change
+}
+
+// ===== useMemo (memoize expensive computation) =====
+function ExpensiveList({ items, filter }) {
+    const filteredItems = useMemo(() =&gt; {
+        return items.filter(item =&gt; item.category === filter)
+                    .sort((a, b) =&gt; a.name.localeCompare(b.name));
+    }, [items, filter]); // recompute only when items or filter changes
+    
+    return filteredItems.map(item =&gt; &lt;Item key={item.id} {...item} /&gt;);
+}
+
+// ===== useCallback (memoize function reference) =====
+function ParentComponent() {
+    const [count, setCount] = useState(0);
+    
+    // Without useCallback, handleClick is recreated every render
+    // causing ChildComponent to re-render unnecessarily
+    const handleClick = useCallback((id) =&gt; {
+        console.log("Clicked:", id);
+    }, []); // empty deps = never recreated
+    
+    return &lt;ChildComponent onClick={handleClick} /&gt;;
+}
+const ChildComponent = React.memo(({ onClick }) =&gt; {
+    // Only re-renders if onClick reference changes
+    return &lt;button onClick={() =&gt; onClick(1)}&gt;Click&lt;/button&gt;;
+});
+
+// ===== useRef =====
+function TextInput() {
+    const inputRef = useRef(null);
+    const renderCount = useRef(0);
+    
+    useEffect(() =&gt; {
+        renderCount.current += 1; // does NOT cause re-render
+    });
+    
+    const focusInput = () =&gt; inputRef.current.focus();
+    
+    return (
+        &lt;div&gt;
+            &lt;input ref={inputRef} /&gt;
+            &lt;button onClick={focusInput}&gt;Focus&lt;/button&gt;
+            &lt;p&gt;Rendered {renderCount.current} times&lt;/p&gt;
+        &lt;/div&gt;
+    );
+}
+
+// ===== Custom Hook =====
+function useLocalStorage(key, initialValue) {
+    const [value, setValue] = useState(() =&gt; {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : initialValue;
+    });
+    
+    useEffect(() =&gt; {
+        localStorage.setItem(key, JSON.stringify(value));
+    }, [key, value]);
+    
+    return [value, setValue];
+}
+// Usage: const [theme, setTheme] = useLocalStorage('theme', 'dark');
+</pre>
+
+<h3>5.3 Performance Optimization</h3>
+
+<table>
+<thead><tr><th>Technique</th><th>What It Does</th><th>When to Use</th></tr></thead>
+<tbody>
+<tr><td><code>React.memo</code></td><td>Prevents re-render if props unchanged</td><td>Pure components with expensive renders</td></tr>
+<tr><td><code>useMemo</code></td><td>Caches computed value</td><td>Expensive calculations</td></tr>
+<tr><td><code>useCallback</code></td><td>Caches function reference</td><td>Passing callbacks to memoized children</td></tr>
+<tr><td>Code Splitting</td><td><code>React.lazy + Suspense</code></td><td>Large components not needed immediately</td></tr>
+<tr><td>Virtualization</td><td>Render only visible items</td><td>Long lists (react-window)</td></tr>
+<tr><td>Key prop</td><td>Helps React identify list items</td><td>Always use unique, stable keys</td></tr>
+</tbody>
+</table>
+
+<h3>5.4 Interview Questions</h3>
+
+<div class="qa">
+<div class="question">What is the Virtual DOM and how does it work?</div>
+<div class="answer">The Virtual DOM is a lightweight JavaScript copy of the real DOM. When state changes: (1) React creates a new Virtual DOM tree, (2) Diffs it with the previous one (reconciliation), (3) Computes minimum changes needed, (4) Batches updates to the real DOM. This is faster than manipulating the real DOM directly.</div>
+</div>
+
+<div class="qa">
+<div class="question">Why do we need keys in lists?</div>
+<div class="answer">Keys help React identify which items changed, were added, or removed during reconciliation. Without stable keys, React may re-render entire lists unnecessarily or mix up component state. Use unique IDs, never use array index for dynamic lists.</div>
+</div>
+
+<div class="qa">
+<div class="question">What is prop drilling and how to avoid it?</div>
+<div class="answer">Prop drilling is passing props through many intermediate components that don't need them. Solutions: (1) React Context API for global state, (2) State management (Redux/Zustand), (3) Component composition — pass components as children instead of data.</div>
+</div>
+
+<div class="card warning">
+<h4>⚠️ Common Mistakes</h4>
+<ul>
+<li>Overusing <code>useMemo</code>/<code>useCallback</code> — they have overhead too; profile first</li>
+<li>Missing dependency array values in <code>useEffect</code> (stale closures)</li>
+<li>Directly mutating state: <code>state.push(item)</code> instead of <code>setState([...state, item])</code></li>
+<li>Using index as key in dynamic lists</li>
+<li>Fetching data in useEffect without cleanup (race conditions)</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="redux">
+<div class="section-header">
+<h2>06 — Redux</h2>
+<p>Store, reducers, actions, middleware, Redux Toolkit, and when to use Redux.</p>
+</div>
+
+<h3>6.1 Core Concepts</h3>
+
+<div class="card concept">
+<p><strong>Redux</strong> is a predictable state container. It has three principles:</p>
+<ol>
+<li><strong>Single source of truth:</strong> Entire app state in one store</li>
+<li><strong>State is read-only:</strong> Only way to change is by dispatching actions</li>
+<li><strong>Changes via pure functions:</strong> Reducers are pure functions (state + action → new state)</li>
+</ol>
+<p><strong>Flow:</strong> Component dispatches Action → Middleware (optional) → Reducer processes → Store updates → Component re-renders</p>
+</div>
+
+<pre>
+// ===== CLASSIC REDUX (for understanding) =====
+
+// Action Types
+const INCREMENT = 'counter/increment';
+const DECREMENT = 'counter/decrement';
+
+// Action Creators
+const increment = (amount = 1) =&gt; ({ type: INCREMENT, payload: amount });
+const decrement = (amount = 1) =&gt; ({ type: DECREMENT, payload: amount });
+
+// Reducer (pure function — no side effects!)
+const initialState = { value: 0 };
+
+function counterReducer(state = initialState, action) {
+    switch (action.type) {
+        case INCREMENT:
+            return { ...state, value: state.value + action.payload };
+        case DECREMENT:
+            return { ...state, value: state.value - action.payload };
+        default:
+            return state;
+    }
+}
+</pre>
+
+<h3>6.2 Redux Toolkit (Modern Redux)</h3>
+
+<pre>
+// Redux Toolkit — the recommended way to write Redux
+import { createSlice, configureStore, createAsyncThunk } from '@reduxjs/toolkit';
+
+// createSlice = actions + reducer in one
+const counterSlice = createSlice({
+    name: 'counter',
+    initialState: { value: 0, status: 'idle' },
+    reducers: {
+        increment: (state) =&gt; { state.value += 1; },  // Immer allows "mutation"
+        decrement: (state) =&gt; { state.value -= 1; },
+        incrementByAmount: (state, action) =&gt; {
+            state.value += action.payload;
+        },
+        reset: (state) =&gt; { state.value = 0; }
+    }
+});
+
+// Async thunk for API calls
+const fetchUsers = createAsyncThunk(
+    'users/fetchUsers',
+    async (_, { rejectWithValue }) =&gt; {
+        try {
+            const response = await fetch('/api/users');
+            if (!response.ok) throw new Error('Failed');
+            return await response.json();
+        } catch (err) {
+            return rejectWithValue(err.message);
+        }
+    }
+);
+
+const usersSlice = createSlice({
+    name: 'users',
+    initialState: { list: [], status: 'idle', error: null },
+    reducers: {},
+    extraReducers: (builder) =&gt; {
+        builder
+            .addCase(fetchUsers.pending, (state) =&gt; {
+                state.status = 'loading';
+            })
+            .addCase(fetchUsers.fulfilled, (state, action) =&gt; {
+                state.status = 'succeeded';
+                state.list = action.payload;
+            })
+            .addCase(fetchUsers.rejected, (state, action) =&gt; {
+                state.status = 'failed';
+                state.error = action.payload;
+            });
+    }
+});
+
+// Configure store
+const store = configureStore({
+    reducer: {
+        counter: counterSlice.reducer,
+        users: usersSlice.reducer,
+    }
+});
+
+export const { increment, decrement, incrementByAmount } = counterSlice.actions;
+</pre>
+
+<h3>6.3 Using Redux in React Components</h3>
+
+<pre>
+import { useSelector, useDispatch } from 'react-redux';
+import { increment, decrement, fetchUsers } from './store';
+
+function Counter() {
+    const count = useSelector((state) =&gt; state.counter.value);
+    const dispatch = useDispatch();
+    
+    return (
+        &lt;div&gt;
+            &lt;p&gt;Count: {count}&lt;/p&gt;
+            &lt;button onClick={() =&gt; dispatch(increment())}&gt;+&lt;/button&gt;
+            &lt;button onClick={() =&gt; dispatch(decrement())}&gt;-&lt;/button&gt;
+        &lt;/div&gt;
+    );
+}
+
+function UserList() {
+    const { list, status, error } = useSelector((state) =&gt; state.users);
+    const dispatch = useDispatch();
+    
+    useEffect(() =&gt; {
+        if (status === 'idle') dispatch(fetchUsers());
+    }, [status, dispatch]);
+    
+    if (status === 'loading') return &lt;Spinner /&gt;;
+    if (status === 'failed') return &lt;p&gt;Error: {error}&lt;/p&gt;;
+    
+    return list.map(user =&gt; &lt;UserCard key={user.id} user={user} /&gt;);
+}
+</pre>
+
+<h3>6.4 When to Use Redux vs Not</h3>
+
+<table>
+<thead><tr><th>Use Redux When</th><th>Don't Use Redux When</th></tr></thead>
+<tbody>
+<tr><td>Many components need same state</td><td>State is local to one component</td></tr>
+<tr><td>Complex state update logic</td><td>Simple state (toggle, form input)</td></tr>
+<tr><td>State needs to be inspectable/debuggable</td><td>Small app with few components</td></tr>
+<tr><td>Caching server data across pages</td><td>Only fetching data (use React Query)</td></tr>
+<tr><td>Undo/redo functionality needed</td><td>State doesn't change often</td></tr>
+</tbody>
+</table>
+
+<div class="qa">
+<div class="question">What is middleware in Redux? Give an example.</div>
+<div class="answer">Middleware sits between dispatching an action and the reducer. It can intercept, modify, delay, or replace actions. Common uses: logging, async operations (thunk), analytics. Redux Thunk allows you to dispatch functions (not just objects) for async logic.</div>
+</div>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Always mention Redux Toolkit — classic Redux is considered legacy</li>
+<li>Know alternatives: Zustand (simpler), Jotai (atomic), React Query (server state)</li>
+<li>Explain the unidirectional data flow clearly</li>
+<li>Understand Immer (used internally by RTK) — it allows "mutating" syntax while producing immutable updates</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="postgresql">
+<div class="section-header">
+<h2>07 — PostgreSQL</h2>
+<p>Joins, indexing, query optimization, transactions, ACID properties, and advanced queries.</p>
+</div>
+
+<h3>7.1 Joins (All Types)</h3>
+
+<table>
+<thead><tr><th>Join Type</th><th>Returns</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td>INNER JOIN</td><td>Only matching rows from both tables</td><td>Get orders with their customers</td></tr>
+<tr><td>LEFT JOIN</td><td>All from left + matching from right (NULL if no match)</td><td>All customers, even those without orders</td></tr>
+<tr><td>RIGHT JOIN</td><td>All from right + matching from left</td><td>Rarely used — restructure as LEFT JOIN</td></tr>
+<tr><td>FULL OUTER JOIN</td><td>All rows from both (NULLs where no match)</td><td>Finding unmatched records on both sides</td></tr>
+<tr><td>CROSS JOIN</td><td>Cartesian product (every combo)</td><td>Generate combinations</td></tr>
+<tr><td>SELF JOIN</td><td>Table joined with itself</td><td>Employee-manager relationships</td></tr>
+</tbody>
+</table>
+
+<pre>
+-- Setup tables
+CREATE TABLE customers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE
+);
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    customer_id INT REFERENCES customers(id),
+    amount DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- INNER JOIN: customers who have placed orders
+SELECT c.name, o.id AS order_id, o.amount
+FROM customers c
+INNER JOIN orders o ON c.id = o.customer_id;
+
+-- LEFT JOIN: all customers, with order info (NULL if no orders)
+SELECT c.name, COUNT(o.id) AS order_count, COALESCE(SUM(o.amount), 0) AS total
+FROM customers c
+LEFT JOIN orders o ON c.id = o.customer_id
+GROUP BY c.id, c.name;
+
+-- Find customers with NO orders
+SELECT c.name
+FROM customers c
+LEFT JOIN orders o ON c.id = o.customer_id
+WHERE o.id IS NULL;
+
+-- SELF JOIN: employee-manager
+SELECT e.name AS employee, m.name AS manager
+FROM employees e
+LEFT JOIN employees m ON e.manager_id = m.id;
+</pre>
+
+<h3>7.2 Indexing</h3>
+
+<div class="card concept">
+<p>An <strong>index</strong> is a data structure (usually B-tree) that speeds up data retrieval. Without an index, PostgreSQL does a <strong>sequential scan</strong> (reads every row). With an index, it does an <strong>index scan</strong> (jumps directly to matching rows).</p>
+<p><strong>Trade-off:</strong> Indexes speed up reads but slow down writes (INSERT/UPDATE/DELETE) because the index must be updated too.</p>
+</div>
+
+<pre>
+-- B-tree index (default, most common)
+CREATE INDEX idx_customers_email ON customers(email);
+
+-- Composite index (multi-column)
+CREATE INDEX idx_orders_customer_date ON orders(customer_id, created_at DESC);
+
+-- Partial index (only index subset of rows)
+CREATE INDEX idx_active_users ON users(email) WHERE is_active = true;
+
+-- GIN index (for JSONB, arrays, full-text search)
+CREATE INDEX idx_products_tags ON products USING GIN(tags);
+
+-- Expression index
+CREATE INDEX idx_lower_email ON users(LOWER(email));
+
+-- Check if index is being used
+EXPLAIN ANALYZE
+SELECT * FROM customers WHERE email = 'john@example.com';
+-- Should show "Index Scan" not "Seq Scan"
+</pre>
+
+<h3>7.3 Query Optimization</h3>
+
+<pre>
+-- Use EXPLAIN ANALYZE to see query plan
+EXPLAIN ANALYZE
+SELECT c.name, COUNT(o.id)
+FROM customers c
+JOIN orders o ON c.id = o.customer_id
+WHERE o.created_at > '2024-01-01'
+GROUP BY c.name
+ORDER BY COUNT(o.id) DESC
+LIMIT 10;
+
+-- Key things to look for in EXPLAIN output:
+-- Seq Scan → missing index
+-- Nested Loop → may need different join strategy for large tables
+-- Sort → consider adding ORDER BY column to index
+-- Actual rows vs estimated rows → run ANALYZE to update statistics
+</pre>
+
+<div class="card concept">
+<h4>Optimization Rules</h4>
+<ul>
+<li>Add indexes on columns used in WHERE, JOIN, ORDER BY</li>
+<li>Use <code>EXPLAIN ANALYZE</code> to verify index usage</li>
+<li>Avoid <code>SELECT *</code> — select only needed columns</li>
+<li>Use <code>LIMIT</code> for pagination</li>
+<li>Use <code>EXISTS</code> instead of <code>IN</code> for subqueries with large datasets</li>
+<li>Avoid functions on indexed columns in WHERE: <code>WHERE LOWER(email) = ...</code> won't use a regular index</li>
+<li>Run <code>VACUUM ANALYZE</code> regularly to update statistics</li>
+</ul>
+</div>
+
+<h3>7.4 Transactions & ACID</h3>
+
+<table>
+<thead><tr><th>Property</th><th>Meaning</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Atomicity</strong></td><td>All or nothing — either all operations succeed or none</td><td>Bank transfer: debit AND credit must both happen</td></tr>
+<tr><td><strong>Consistency</strong></td><td>DB goes from one valid state to another</td><td>Constraints are maintained after transaction</td></tr>
+<tr><td><strong>Isolation</strong></td><td>Concurrent transactions don't interfere</td><td>Two users buying last item simultaneously</td></tr>
+<tr><td><strong>Durability</strong></td><td>Once committed, data survives crashes</td><td>Data written to disk/WAL</td></tr>
+</tbody>
+</table>
+
+<pre>
+-- Transaction example: bank transfer
+BEGIN;
+
+UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+UPDATE accounts SET balance = balance + 500 WHERE id = 2;
+
+-- Check constraint
+DO $$
+BEGIN
+    IF (SELECT balance FROM accounts WHERE id = 1) < 0 THEN
+        RAISE EXCEPTION 'Insufficient funds';
+    END IF;
+END $$;
+
+COMMIT;  -- or ROLLBACK if something went wrong
+
+-- Isolation levels
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;    -- default
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;   -- prevents non-repeatable reads
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;      -- strictest, prevents all anomalies
+</pre>
+
+<h3>7.5 Advanced Queries</h3>
+
+<pre>
+-- Window functions
+SELECT name, department, salary,
+    RANK() OVER (PARTITION BY department ORDER BY salary DESC) as dept_rank,
+    AVG(salary) OVER (PARTITION BY department) as dept_avg,
+    salary - AVG(salary) OVER (PARTITION BY department) as diff_from_avg
+FROM employees;
+
+-- CTE (Common Table Expression)
+WITH high_value_customers AS (
+    SELECT customer_id, SUM(amount) as total_spent
+    FROM orders
+    GROUP BY customer_id
+    HAVING SUM(amount) > 10000
+)
+SELECT c.name, hvc.total_spent
+FROM customers c
+JOIN high_value_customers hvc ON c.id = hvc.customer_id;
+
+-- Recursive CTE (org chart)
+WITH RECURSIVE org_chart AS (
+    SELECT id, name, manager_id, 0 as depth
+    FROM employees WHERE manager_id IS NULL
+    UNION ALL
+    SELECT e.id, e.name, e.manager_id, oc.depth + 1
+    FROM employees e
+    JOIN org_chart oc ON e.manager_id = oc.id
+)
+SELECT * FROM org_chart ORDER BY depth;
+</pre>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Draw a Venn diagram when explaining JOINs</li>
+<li>Always mention EXPLAIN ANALYZE when asked about optimization</li>
+<li>Know the difference between WHERE and HAVING</li>
+<li>Understand isolation levels and their trade-offs</li>
+<li>Practice window functions — they are asked frequently</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="mongodb">
+<div class="section-header">
+<h2>08 — MongoDB</h2>
+<p>Schema design, aggregation pipeline, indexing, SQL vs NoSQL, and performance tuning.</p>
+</div>
+
+<h3>8.1 Schema Design</h3>
+
+<div class="card concept">
+<p>MongoDB is a <strong>document database</strong>. Data is stored as <strong>BSON documents</strong> (JSON-like). Unlike SQL, there is no fixed schema — documents in a collection can have different fields.</p>
+<p><strong>Key design decision:</strong> Embed (denormalize) vs Reference (normalize).</p>
+</div>
+
+<table>
+<thead><tr><th>Approach</th><th>When to Use</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Embed</strong> (nested)</td><td>1:1 or 1:few, data accessed together, data doesn't change often</td><td>User → address, blog → comments (few)</td></tr>
+<tr><td><strong>Reference</strong> (separate)</td><td>1:many or many:many, data accessed independently, frequently updated</td><td>User → orders (many), product → categories</td></tr>
+</tbody>
+</table>
+
+<pre>
+// Embedded design — user with address
+{
+  "_id": ObjectId("..."),
+  "name": "John Doe",
+  "email": "john@example.com",
+  "address": {
+    "street": "123 Main St",
+    "city": "New York",
+    "zip": "10001"
+  },
+  "orders": [
+    { "product": "Laptop", "amount": 999.99, "date": ISODate("2024-01-15") },
+    { "product": "Mouse", "amount": 29.99, "date": ISODate("2024-02-10") }
+  ]
+}
+
+// Referenced design — separate collections
+// users collection
+{ "_id": ObjectId("user1"), "name": "John", "email": "john@example.com" }
+
+// orders collection
+{ "_id": ObjectId("order1"), "user_id": ObjectId("user1"), "product": "Laptop", "amount": 999.99 }
+</pre>
+
+<h3>8.2 CRUD Operations</h3>
+
+<pre>
+// Insert
+db.users.insertOne({ name: "Alice", age: 30, tags: ["developer"] });
+db.users.insertMany([{ name: "Bob" }, { name: "Charlie" }]);
+
+// Find
+db.users.find({ age: { $gte: 25, $lte: 40 } });             // range
+db.users.find({ tags: { $in: ["developer", "designer"] } });  // in array
+db.users.find({ name: { $regex: /^A/i } });                   // regex
+db.users.find({ "address.city": "New York" });                 // nested field
+
+// Update
+db.users.updateOne(
+  { _id: ObjectId("...") },
+  { $set: { name: "Alice Smith" }, $push: { tags: "senior" }, $inc: { loginCount: 1 } }
+);
+
+// Delete
+db.users.deleteMany({ isActive: false });
+</pre>
+
+<h3>8.3 Aggregation Pipeline</h3>
+
+<div class="card concept">
+<p>The aggregation pipeline processes documents through stages. Each stage transforms the data. Think of it like Unix pipes: <code>data | $match | $group | $sort | $project</code></p>
+</div>
+
+<pre>
+// Example: Sales analytics
+db.orders.aggregate([
+  // Stage 1: Filter orders from 2024
+  { $match: { date: { $gte: ISODate("2024-01-01") } } },
+  
+  // Stage 2: Lookup customer info (like SQL JOIN)
+  { $lookup: {
+      from: "customers",
+      localField: "customer_id",
+      foreignField: "_id",
+      as: "customer"
+  }},
+  { $unwind: "$customer" },
+  
+  // Stage 3: Group by customer, calculate totals
+  { $group: {
+      _id: "$customer.name",
+      totalOrders: { $sum: 1 },
+      totalSpent: { $sum: "$amount" },
+      avgOrder: { $avg: "$amount" },
+      lastOrder: { $max: "$date" }
+  }},
+  
+  // Stage 4: Filter top customers
+  { $match: { totalSpent: { $gte: 1000 } } },
+  
+  // Stage 5: Sort by spending
+  { $sort: { totalSpent: -1 } },
+  
+  // Stage 6: Format output
+  { $project: {
+      customer: "$_id",
+      totalOrders: 1,
+      totalSpent: { $round: ["$totalSpent", 2] },
+      avgOrder: { $round: ["$avgOrder", 2] },
+      _id: 0
+  }},
+  
+  // Stage 7: Limit results
+  { $limit: 10 }
+]);
+</pre>
+
+<h3>8.4 Indexing in MongoDB</h3>
+
+<pre>
+// Single field index
+db.users.createIndex({ email: 1 });  // 1 = ascending, -1 = descending
+
+// Compound index
+db.orders.createIndex({ customer_id: 1, date: -1 });
+
+// Text index (full-text search)
+db.articles.createIndex({ title: "text", content: "text" });
+db.articles.find({ $text: { $search: "mongodb tutorial" } });
+
+// TTL index (auto-delete after time)
+db.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 });
+
+// Unique index
+db.users.createIndex({ email: 1 }, { unique: true });
+
+// Check index usage
+db.users.find({ email: "john@example.com" }).explain("executionStats");
+</pre>
+
+<h3>8.5 SQL vs NoSQL</h3>
+
+<table>
+<thead><tr><th>Feature</th><th>SQL (PostgreSQL)</th><th>NoSQL (MongoDB)</th></tr></thead>
+<tbody>
+<tr><td>Data Model</td><td>Tables with rows/columns</td><td>Documents (JSON-like)</td></tr>
+<tr><td>Schema</td><td>Fixed, predefined</td><td>Flexible, dynamic</td></tr>
+<tr><td>Relationships</td><td>JOINs</td><td>Embed or $lookup</td></tr>
+<tr><td>Scaling</td><td>Vertical (bigger server)</td><td>Horizontal (sharding)</td></tr>
+<tr><td>Transactions</td><td>Full ACID</td><td>ACID (since 4.0, multi-doc)</td></tr>
+<tr><td>Query Language</td><td>SQL</td><td>MQL (MongoDB Query)</td></tr>
+<tr><td>Best For</td><td>Complex relations, consistency</td><td>Flexible data, high write loads</td></tr>
+</tbody>
+</table>
+
+<div class="qa">
+<div class="question">When would you choose MongoDB over PostgreSQL?</div>
+<div class="answer">Choose MongoDB when: data structure changes frequently, you need horizontal scaling, schema is unpredictable (IoT, logs, CMS), you need high write throughput, or data is naturally document-shaped. Choose PostgreSQL when: data has complex relationships, you need strict ACID, data integrity is critical (finance), or you need complex joins and aggregations.</div>
+</div>
+
+<div class="card tip">
+<h4>💡 Interview Tips</h4>
+<ul>
+<li>Know when to embed vs reference — this is the #1 MongoDB design question</li>
+<li>Be able to write an aggregation pipeline from scratch</li>
+<li>Understand that MongoDB has ACID transactions since v4.0</li>
+<li>Know the trade-offs of denormalization (faster reads, harder updates)</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="system-design">
+<div class="section-header">
+<h2>09 — System Design (Beginner)</h2>
+<p>URL shortener, chat system, and scalable API — explained simply.</p>
+</div>
+
+<h3>9.1 Design a URL Shortener (like bit.ly)</h3>
+
+<div class="card concept">
+<h4>Requirements</h4>
+<ul>
+<li>Given a long URL, generate a short URL</li>
+<li>Redirect short URL to original long URL</li>
+<li>Handle millions of URLs</li>
+<li>Short URL should be unique and short (6-8 chars)</li>
+</ul>
+</div>
+
+<h4>Solution Architecture</h4>
+<pre>
+User → Load Balancer → API Server → Database
+                                  → Cache (Redis)
+
+POST /shorten { "url": "https://very-long-url.com/..." }
+→ Returns: { "short_url": "https://short.ly/abc123" }
+
+GET /abc123
+→ 301 Redirect to original URL
+</pre>
+
+<h4>Key Decisions</h4>
+<table>
+<thead><tr><th>Component</th><th>Choice</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Short ID Generation</td><td>Base62 encoding of auto-increment ID or hash</td><td>62^6 = 56 billion unique URLs</td></tr>
+<tr><td>Database</td><td>PostgreSQL (or DynamoDB for scale)</td><td>Simple key-value lookup</td></tr>
+<tr><td>Cache</td><td>Redis</td><td>Cache hot URLs, reduce DB load</td></tr>
+<tr><td>Redirect Code</td><td>301 (permanent) or 302 (temporary)</td><td>301 for SEO, 302 if tracking clicks</td></tr>
+</tbody>
+</table>
+
+<pre>
+# Python implementation sketch
+import hashlib, string
+
+BASE62 = string.ascii_letters + string.digits
+
+def encode_base62(num):
+    if num == 0: return BASE62[0]
+    result = []
+    while num:
+        result.append(BASE62[num % 62])
+        num //= 62
+    return ''.join(reversed(result))
+
+# Method 1: Auto-increment ID → Base62
+# ID 12345 → encode_base62(12345) → "dnh"
+
+# Method 2: Hash the URL
+def shorten(url):
+    hash_hex = hashlib.md5(url.encode()).hexdigest()
+    hash_int = int(hash_hex[:10], 16)
+    return encode_base62(hash_int)[:7]
+</pre>
+
+<h3>9.2 Design a Chat System</h3>
+
+<div class="card concept">
+<h4>Requirements</h4>
+<ul>
+<li>Real-time 1:1 and group messaging</li>
+<li>Online/offline status</li>
+<li>Message history</li>
+<li>Read receipts</li>
+</ul>
+</div>
+
+<h4>Architecture</h4>
+<pre>
+Client ←WebSocket→ Chat Server → Message Queue (Redis/RabbitMQ)
+                                → Database (MongoDB for messages)
+                                → Presence Service (Redis)
+
+Flow:
+1. User connects via WebSocket → server maps userId → socketId
+2. User sends message → server routes to recipient's socket
+3. If recipient offline → store in DB, deliver when online (push notification)
+4. Group chat → fan out message to all group members
+</pre>
+
+<h4>Key Decisions</h4>
+<table>
+<thead><tr><th>Component</th><th>Choice</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Protocol</td><td>WebSocket</td><td>Persistent, bidirectional, real-time</td></tr>
+<tr><td>Message Store</td><td>MongoDB or Cassandra</td><td>High write throughput, flexible schema</td></tr>
+<tr><td>Presence</td><td>Redis (key: userId, value: lastSeen)</td><td>Fast in-memory lookups</td></tr>
+<tr><td>Message Queue</td><td>Redis Pub/Sub or Kafka</td><td>Decouple sending from processing</td></tr>
+<tr><td>File Sharing</td><td>S3 + CDN</td><td>Store files separately, send URL in message</td></tr>
+</tbody>
+</table>
+
+<h3>9.3 Design a Scalable REST API</h3>
+
+<div class="card concept">
+<h4>Key Principles</h4>
+<ul>
+<li><strong>Stateless:</strong> Server stores no client state — use JWT tokens</li>
+<li><strong>Rate Limiting:</strong> Prevent abuse (e.g., 100 requests/minute per user)</li>
+<li><strong>Pagination:</strong> Never return all records — use cursor or offset pagination</li>
+<li><strong>Caching:</strong> Redis for hot data, CDN for static assets</li>
+<li><strong>Versioning:</strong> <code>/api/v1/users</code> — always version your API</li>
+</ul>
+</div>
+
+<pre>
+Architecture for 10K+ requests/second:
+
+                    ┌─ API Server 1 ─┐
+Client → CDN → LB ─┼─ API Server 2 ─┼─ DB (Primary)
+                    └─ API Server 3 ─┘      ↓
+                          ↓            DB (Read Replica)
+                        Redis Cache
+
+Scaling strategies:
+1. Horizontal scaling: Add more API servers behind load balancer
+2. Database: Read replicas for read-heavy workloads
+3. Caching: Redis/Memcached to reduce DB queries
+4. CDN: Cache static content at edge locations
+5. Message queue: Offload heavy tasks (email, image processing)
+6. Database sharding: Split data across multiple DB servers
+</pre>
+
+<div class="card tip">
+<h4>💡 System Design Interview Tips</h4>
+<ul>
+<li>Always start with requirements clarification (functional + non-functional)</li>
+<li>Do back-of-envelope calculations (storage, bandwidth, QPS)</li>
+<li>Start simple, then add complexity (caching → sharding → CDN)</li>
+<li>Mention trade-offs for every decision</li>
+<li>Draw diagrams — interviewers love visual explanations</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="mock-interview">
+<div class="section-header">
+<h2>10 — Mock Interview (50+ Real Questions with Answers)</h2>
+<p>Mixed questions from all topics — exactly what companies ask.</p>
+</div>
+
+<h3>Python Questions</h3>
+
+<div class="qa"><div class="question">1. What are Python decorators and when would you use them?</div>
+<div class="answer">Decorators are functions that wrap other functions to add behavior without modifying the original. Used for logging, authentication, caching, rate limiting, and input validation. They use the @syntax and take a function as argument, return a wrapper function.</div></div>
+
+<div class="qa"><div class="question">2. Explain the GIL. How do you achieve parallelism in Python?</div>
+<div class="answer">The GIL (Global Interpreter Lock) allows only one thread to execute Python bytecode at a time. For CPU-bound parallelism, use multiprocessing (separate processes, each with own GIL). For I/O-bound concurrency, use threading or asyncio. Libraries like NumPy release the GIL for C operations.</div></div>
+
+<div class="qa"><div class="question">3. What is the difference between a list and a tuple?</div>
+<div class="answer">Lists are mutable (can be changed), tuples are immutable (cannot be changed after creation). Tuples are slightly faster, use less memory, and can be used as dictionary keys. Use tuples for fixed collections, lists for dynamic ones.</div></div>
+
+<div class="qa"><div class="question">4. How does Python manage memory?</div>
+<div class="answer">Python uses reference counting (each object tracks how many references point to it) plus a cyclic garbage collector for circular references. When reference count hits 0, memory is freed. The gc module handles cycles. Python also uses memory pools (pymalloc) for small objects.</div></div>
+
+<div class="qa"><div class="question">5. What are context managers? Give an example.</div>
+<div class="answer">Context managers handle setup and cleanup using with statement. They implement __enter__ and __exit__ methods. Common use: file handling, database connections, locks. Example: with open("file.txt") as f automatically closes the file even if an exception occurs.</div></div>
+
+<h3>FastAPI / Django Questions</h3>
+
+<div class="qa"><div class="question">6. How does dependency injection work in FastAPI?</div>
+<div class="answer">FastAPI uses the Depends() function. You declare a dependency as a function parameter with Depends(dependency_function). FastAPI calls the dependency function, injects its return value. Dependencies can be nested, cached, and use yield for cleanup. Used for DB sessions, auth, permissions.</div></div>
+
+<div class="qa"><div class="question">7. What is the N+1 query problem? How to fix it in Django?</div>
+<div class="answer">N+1 occurs when you fetch N objects and each triggers an additional query for related data. Fix: use select_related() for ForeignKey (SQL JOIN in one query) or prefetch_related() for ManyToMany (2 queries, Python-side join). This reduces N+1 queries to 1 or 2.</div></div>
+
+<div class="qa"><div class="question">8. Django middleware vs FastAPI middleware — differences?</div>
+<div class="answer">Django middleware is class-based with hooks (process_request, process_view, process_response, process_exception). FastAPI middleware is function-based using @app.middleware("http") and is async-native. Both execute on every request/response cycle. Django middleware order matters in settings.py.</div></div>
+
+<div class="qa"><div class="question">9. How do you handle authentication in FastAPI?</div>
+<div class="answer">Common approach: JWT tokens. Use python-jose for JWT encoding/decoding. Create a dependency that extracts the token from Authorization header, verifies it, and returns the user. Use OAuth2PasswordBearer for token extraction. Hash passwords with bcrypt via passlib.</div></div>
+
+<div class="qa"><div class="question">10. What are Django signals? When should you avoid them?</div>
+<div class="answer">Signals allow decoupled notifications when actions occur (post_save, pre_delete, etc.). Avoid when: logic is tightly coupled to the model (use model methods instead), when you need transactional guarantees, or when the signal chain becomes too complex to debug.</div></div>
+
+<h3>JavaScript Questions</h3>
+
+<div class="qa"><div class="question">11. Explain the JavaScript event loop.</div>
+<div class="answer">JS is single-threaded. The event loop processes: (1) Call Stack (sync code), (2) Microtask Queue (Promise.then, queueMicrotask), (3) Macrotask Queue (setTimeout, setInterval, I/O). After each macrotask, ALL microtasks are processed before the next macrotask.</div></div>
+
+<div class="qa"><div class="question">12. What is a closure? Give a practical example.</div>
+<div class="answer">A closure is a function that retains access to its outer scope variables even after the outer function returns. Practical use: creating private variables, function factories, memoization. Example: counter function that returns increment/decrement methods with a private count variable.</div></div>
+
+<div class="qa"><div class="question">13. What is the difference between var, let, and const?</div>
+<div class="answer">var: function-scoped, hoisted with undefined, can redeclare. let: block-scoped, hoisted but in TDZ (ReferenceError if accessed early), cannot redeclare. const: like let but cannot be reassigned (the binding is immutable, but object contents can change).</div></div>
+
+<div class="qa"><div class="question">14. Explain prototypal inheritance in JavaScript.</div>
+<div class="answer">Every JS object has a hidden [[Prototype]] link to another object. When accessing a property, JS walks up the prototype chain until it finds it or reaches null. Constructor.prototype sets the prototype for instances. ES6 classes are syntactic sugar over this mechanism.</div></div>
+
+<div class="qa"><div class="question">15. What is the difference between Promise.all, Promise.allSettled, and Promise.race?</div>
+<div class="answer">Promise.all: resolves when ALL promises resolve, rejects immediately if ANY rejects. Promise.allSettled: waits for ALL to settle (resolve or reject), never rejects. Promise.race: resolves/rejects as soon as the FIRST promise settles. Use .all for dependent operations, .allSettled for independent ones, .race for timeouts.</div></div>
+
+<h3>React / Redux Questions</h3>
+
+<div class="qa"><div class="question">16. What is the Virtual DOM? Why is it faster?</div>
+<div class="answer">The Virtual DOM is a lightweight JS representation of the real DOM. On state change, React creates a new VDOM, diffs it with the previous one (reconciliation), and applies only the minimal changes to the real DOM. This batched approach is faster than direct DOM manipulation.</div></div>
+
+<div class="qa"><div class="question">17. When would you use useMemo vs useCallback?</div>
+<div class="answer">useMemo memoizes a computed VALUE (expensive calculations). useCallback memoizes a FUNCTION reference (prevents recreating callbacks). Use useCallback when passing callbacks to React.memo-wrapped child components. Use useMemo for expensive filtering/sorting.</div></div>
+
+<div class="qa"><div class="question">18. Explain React component lifecycle with hooks.</div>
+<div class="answer">Mount: useState initializer runs, then useEffect with [] runs. Update: component re-renders, useEffect cleanup runs, then useEffect body runs. Unmount: useEffect cleanup runs. useEffect with [] = componentDidMount. useEffect return = componentWillUnmount.</div></div>
+
+<div class="qa"><div class="question">19. What is prop drilling and how to solve it?</div>
+<div class="answer">Prop drilling is passing props through many intermediate components. Solutions: (1) React Context API for theme/auth/locale. (2) State management (Redux, Zustand). (3) Component composition — render children/slots pattern. (4) Custom hooks for shared logic.</div></div>
+
+<div class="qa"><div class="question">20. Redux Toolkit vs classic Redux — what changed?</div>
+<div class="answer">RTK: createSlice combines actions + reducer. Uses Immer for immutable updates with mutable syntax. createAsyncThunk for async. configureStore with good defaults. Classic Redux: manual action types, action creators, switch statements, spread operators for immutability. RTK is now the standard.</div></div>
+
+<h3>Database Questions</h3>
+
+<div class="qa"><div class="question">21. Explain ACID properties with an example.</div>
+<div class="answer">Atomicity: bank transfer — both debit and credit happen or neither. Consistency: after transfer, total money is same. Isolation: two people transferring from same account don't interfere. Durability: after commit, data survives server crash.</div></div>
+
+<div class="qa"><div class="question">22. What is database indexing? When should you NOT use it?</div>
+<div class="answer">An index is a data structure (B-tree) for fast lookups. Don't use on: columns rarely queried, tables with frequent writes (index maintenance overhead), small tables (seq scan is fine), columns with low cardinality (boolean — only 2 values).</div></div>
+
+<div class="qa"><div class="question">23. Explain normalization vs denormalization.</div>
+<div class="answer">Normalization: split data into related tables to reduce redundancy (1NF, 2NF, 3NF). Denormalization: combine tables for faster reads (duplicate data). SQL databases prefer normalization. NoSQL often uses denormalization. Trade-off: data integrity vs read performance.</div></div>
+
+<div class="qa"><div class="question">24. MongoDB: embed vs reference — when to use which?</div>
+<div class="answer">Embed when: data is always accessed together, 1:1 or 1:few relationship, data rarely changes independently. Reference when: 1:many or many:many, data accessed independently, document would exceed 16MB, data changes frequently.</div></div>
+
+<div class="qa"><div class="question">25. What is a SQL injection? How to prevent it?</div>
+<div class="answer">SQL injection is inserting malicious SQL through user input. Example: input "'; DROP TABLE users; --". Prevention: always use parameterized queries/prepared statements, never concatenate user input into SQL strings. ORMs like Django ORM and SQLAlchemy handle this automatically.</div></div>
+
+<h3>General / Architecture Questions</h3>
+
+<div class="qa"><div class="question">26. REST vs GraphQL — when to use which?</div>
+<div class="answer">REST: resource-based URLs, fixed response shape, simple caching (HTTP), good for CRUD. GraphQL: single endpoint, client specifies exact data needed (no over/under-fetching), good for complex UIs with varied data needs. REST for simple APIs, GraphQL for complex frontends.</div></div>
+
+<div class="qa"><div class="question">27. What is CORS and why does it exist?</div>
+<div class="answer">Cross-Origin Resource Sharing is a security mechanism. Browsers block requests from one origin to another by default. CORS headers (Access-Control-Allow-Origin) tell the browser which origins are allowed. It prevents malicious sites from making requests to your API using a user's cookies.</div></div>
+
+<div class="qa"><div class="question">28. Explain JWT authentication flow.</div>
+<div class="answer">1. User sends credentials (login). 2. Server verifies, creates JWT (header.payload.signature). 3. Server sends JWT to client. 4. Client stores JWT (httpOnly cookie or localStorage). 5. Client sends JWT in Authorization header for each request. 6. Server verifies signature, extracts user info.</div></div>
+
+<div class="qa"><div class="question">29. What is the difference between authentication and authorization?</div>
+<div class="answer">Authentication: "Who are you?" — verifying identity (login, JWT, OAuth). Authorization: "What can you do?" — checking permissions (admin vs user, RBAC). Authentication happens first, then authorization.</div></div>
+
+<div class="qa"><div class="question">30. Explain microservices vs monolith.</div>
+<div class="answer">Monolith: single codebase, single deployment, shared database. Microservices: separate services, independent deployment, each owns its database. Start with monolith (simpler), move to microservices when team grows and services need to scale independently.</div></div>
+
+<div class="qa"><div class="question">31. What is caching? Name caching strategies.</div>
+<div class="answer">Caching stores frequently accessed data in fast storage. Strategies: (1) Cache-aside: app checks cache first, fetches from DB on miss. (2) Write-through: write to cache and DB simultaneously. (3) Write-behind: write to cache, async write to DB. (4) TTL-based: auto-expire after time.</div></div>
+
+<div class="qa"><div class="question">32. What is a message queue? Why use one?</div>
+<div class="answer">A message queue (RabbitMQ, Kafka, Redis) decouples producers from consumers. Producer sends message to queue, consumer processes it asynchronously. Use for: email sending, image processing, order processing — any task that can be done later without blocking the user.</div></div>
+
+<div class="qa"><div class="question">33. Explain the CAP theorem simply.</div>
+<div class="answer">In a distributed system, you can only guarantee 2 of 3: Consistency (all nodes see same data), Availability (every request gets a response), Partition tolerance (system works despite network failures). Since partitions are unavoidable, you choose between CP (consistency) or AP (availability).</div></div>
+
+<div class="qa"><div class="question">34. What is a load balancer?</div>
+<div class="answer">A load balancer distributes incoming requests across multiple servers. Algorithms: Round Robin, Least Connections, IP Hash. Benefits: higher availability, better performance, horizontal scaling. Examples: Nginx, HAProxy, AWS ALB.</div></div>
+
+<div class="qa"><div class="question">35. HTTP status codes — name the important ones.</div>
+<div class="answer">200 OK, 201 Created, 204 No Content. 301 Moved Permanently, 302 Found (redirect). 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity, 429 Too Many Requests. 500 Internal Server Error, 502 Bad Gateway, 503 Service Unavailable.</div></div>
+
+<h3>More Rapid-Fire Questions (36-55)</h3>
+
+<div class="qa"><div class="question">36. What is a race condition?</div>
+<div class="answer">When two processes access shared data simultaneously and the result depends on execution order. Fix: locks, mutexes, atomic operations, or database transactions.</div></div>
+
+<div class="qa"><div class="question">37. Explain Docker in simple terms.</div>
+<div class="answer">Docker packages your app + dependencies into a container that runs the same everywhere. Dockerfile defines the image. docker-compose manages multi-container apps. Containers are lighter than VMs — they share the host OS kernel.</div></div>
+
+<div class="qa"><div class="question">38. What is CI/CD?</div>
+<div class="answer">CI (Continuous Integration): automatically build and test code on every push. CD (Continuous Deployment/Delivery): automatically deploy to staging/production after tests pass. Tools: GitHub Actions, GitLab CI, Jenkins.</div></div>
+
+<div class="qa"><div class="question">39. Git: rebase vs merge?</div>
+<div class="answer">Merge creates a merge commit, preserves history. Rebase replays commits on top of another branch, creates linear history. Use merge for shared branches, rebase for feature branches before merging. Never rebase public/shared branches.</div></div>
+
+<div class="qa"><div class="question">40. What is an API rate limiter and how to implement it?</div>
+<div class="answer">Rate limiter restricts the number of requests a client can make. Algorithms: Token Bucket, Sliding Window, Fixed Window. Implementation: use Redis to track request counts per user/IP with TTL. Return 429 Too Many Requests when limit exceeded.</div></div>
+
+<div class="qa"><div class="question">41. What is WebSocket? When to use over HTTP?</div>
+<div class="answer">WebSocket is a persistent, bidirectional protocol. Unlike HTTP (request-response), WebSocket maintains an open connection. Use for: real-time chat, live updates, gaming, stock tickers — anything requiring instant server-to-client push.</div></div>
+
+<div class="qa"><div class="question">42. Explain the difference between cookies, localStorage, and sessionStorage.</div>
+<div class="answer">Cookies: sent with every HTTP request, 4KB limit, can set expiry, accessible by server. localStorage: 5-10MB, persists until cleared, client-only. sessionStorage: like localStorage but cleared when tab closes. Use cookies for auth tokens, localStorage for preferences.</div></div>
+
+<div class="qa"><div class="question">43. What is SOLID in OOP?</div>
+<div class="answer">S: Single Responsibility — one class, one job. O: Open/Closed — open for extension, closed for modification. L: Liskov Substitution — subclasses should be substitutable. I: Interface Segregation — many specific interfaces over one general. D: Dependency Inversion — depend on abstractions, not implementations.</div></div>
+
+<div class="qa"><div class="question">44. What are environment variables? Why use them?</div>
+<div class="answer">Environment variables store configuration outside code: API keys, database URLs, secrets. They prevent hardcoding sensitive data, allow different configs per environment (dev/staging/prod), and keep secrets out of version control. Use .env files locally, secrets managers in production.</div></div>
+
+<div class="qa"><div class="question">45. Explain the difference between SQL JOIN types with a one-line example each.</div>
+<div class="answer">INNER: only matching rows from both. LEFT: all from left, NULLs for unmatched right. RIGHT: all from right, NULLs for unmatched left. FULL OUTER: all from both, NULLs where no match. CROSS: every combination (cartesian product).</div></div>
+
+<div class="qa"><div class="question">46. What is the purpose of __init__.py in Python?</div>
+<div class="answer">It marks a directory as a Python package, allowing imports. Can be empty or contain initialization code. In Python 3.3+, it is optional for namespace packages, but still recommended for explicit packages. Used to define __all__ for controlling star imports.</div></div>
+
+<div class="qa"><div class="question">47. What is debouncing and throttling in JavaScript?</div>
+<div class="answer">Debounce: wait until user STOPS triggering for X ms, then execute once (search input). Throttle: execute at most once per X ms (scroll handler). Debounce delays execution, throttle limits frequency.</div></div>
+
+<div class="qa"><div class="question">48. How does React handle forms? Controlled vs uncontrolled?</div>
+<div class="answer">Controlled: React state drives the input value (onChange updates state, value from state). Uncontrolled: DOM manages its own state, use useRef to access. Controlled is recommended — gives React full control over form data.</div></div>
+
+<div class="qa"><div class="question">49. What is the difference between PUT and PATCH?</div>
+<div class="answer">PUT replaces the entire resource (send all fields). PATCH partially updates the resource (send only changed fields). PUT is idempotent. In practice, most APIs use PATCH for updates.</div></div>
+
+<div class="qa"><div class="question">50. What happens when you type a URL in the browser?</div>
+<div class="answer">1. DNS lookup (domain → IP). 2. TCP connection (3-way handshake). 3. TLS handshake (if HTTPS). 4. HTTP request sent. 5. Server processes, returns response. 6. Browser parses HTML → builds DOM. 7. Fetches CSS/JS → builds CSSOM. 8. Renders page (layout → paint → composite).</div></div>
+
+<div class="qa"><div class="question">51. What is database connection pooling?</div>
+<div class="answer">Maintaining a pool of reusable database connections instead of opening/closing for each request. Reduces overhead of establishing connections. Tools: SQLAlchemy (pool_size), Django (CONN_MAX_AGE), PgBouncer for PostgreSQL.</div></div>
+
+<div class="qa"><div class="question">52. Explain the concept of idempotency in REST APIs.</div>
+<div class="answer">An idempotent operation produces the same result regardless of how many times it is called. GET, PUT, DELETE are idempotent. POST is NOT idempotent (creates new resource each time). Important for retry logic and reliability.</div></div>
+
+<div class="qa"><div class="question">53. What is server-side rendering (SSR) vs client-side rendering (CSR)?</div>
+<div class="answer">SSR: server generates full HTML, sends to browser (better SEO, faster first paint). CSR: browser downloads JS, renders in client (better interactivity after load). Next.js supports both. Use SSR for content sites, CSR for dashboards/SPAs.</div></div>
+
+<div class="qa"><div class="question">54. How do you handle errors in a production API?</div>
+<div class="answer">Use structured error responses (status code + error message + error code). Log errors with context (request ID, user, stack trace). Use centralized error handling middleware. Never expose internal errors to clients. Use monitoring (Sentry, Datadog).</div></div>
+
+<div class="qa"><div class="question">55. What is the difference between horizontal and vertical scaling?</div>
+<div class="answer">Vertical: upgrade the existing server (more CPU, RAM). Horizontal: add more servers behind a load balancer. Vertical has limits and is expensive. Horizontal is more resilient and cost-effective but requires stateless design.</div></div>
+
+</div>
+
+
+<div class="container section" id="dsa">
+<div class="section-header">
+<h2>11 — Coding Round (30+ DSA Problems)</h2>
+<p>Arrays, strings, hashmaps, recursion, and trees — with approach and solutions.</p>
+</div>
+
+<h3>Arrays</h3>
+
+<h4><span class="badge easy">Easy</span> 1. Two Sum</h4>
+<pre>
+# Given array and target, find two indices that sum to target
+def two_sum(nums, target):
+    seen = {}  # value → index
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in seen:
+            return [seen[complement], i]
+        seen[num] = i
+    return []
+# Time: O(n), Space: O(n)
+# Approach: Use hashmap to store seen values, check if complement exists
+</pre>
+
+<h4><span class="badge easy">Easy</span> 2. Best Time to Buy and Sell Stock</h4>
+<pre>
+def max_profit(prices):
+    min_price = float('inf')
+    max_profit = 0
+    for price in prices:
+        min_price = min(min_price, price)
+        max_profit = max(max_profit, price - min_price)
+    return max_profit
+# Time: O(n), Space: O(1)
+# Approach: Track minimum price so far, calculate profit at each step
+</pre>
+
+<h4><span class="badge easy">Easy</span> 3. Contains Duplicate</h4>
+<pre>
+def contains_duplicate(nums):
+    return len(nums) != len(set(nums))
+# Time: O(n), Space: O(n)
+</pre>
+
+<h4><span class="badge medium">Medium</span> 4. Product of Array Except Self</h4>
+<pre>
+def product_except_self(nums):
+    n = len(nums)
+    result = [1] * n
+    # Left pass: result[i] = product of all elements to the left
+    prefix = 1
+    for i in range(n):
+        result[i] = prefix
+        prefix *= nums[i]
+    # Right pass: multiply by product of all elements to the right
+    suffix = 1
+    for i in range(n - 1, -1, -1):
+        result[i] *= suffix
+        suffix *= nums[i]
+    return result
+# Time: O(n), Space: O(1) excluding output
+# Approach: Use prefix and suffix products without division
+</pre>
+
+<h4><span class="badge medium">Medium</span> 5. Maximum Subarray (Kadane's Algorithm)</h4>
+<pre>
+def max_subarray(nums):
+    current_sum = max_sum = nums[0]
+    for num in nums[1:]:
+        current_sum = max(num, current_sum + num)
+        max_sum = max(max_sum, current_sum)
+    return max_sum
+# Time: O(n), Space: O(1)
+# Approach: At each element, decide: start new subarray or extend current
+</pre>
+
+<h4><span class="badge medium">Medium</span> 6. Merge Intervals</h4>
+<pre>
+def merge_intervals(intervals):
+    intervals.sort(key=lambda x: x[0])
+    merged = [intervals[0]]
+    for start, end in intervals[1:]:
+        if start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged
+# Time: O(n log n), Space: O(n)
+# Input: [[1,3],[2,6],[8,10],[15,18]] → Output: [[1,6],[8,10],[15,18]]
+</pre>
+
+<h4><span class="badge hard">Hard</span> 7. Trapping Rain Water</h4>
+<pre>
+def trap(height):
+    left, right = 0, len(height) - 1
+    left_max = right_max = water = 0
+    while left < right:
+        if height[left] < height[right]:
+            if height[left] >= left_max:
+                left_max = height[left]
+            else:
+                water += left_max - height[left]
+            left += 1
+        else:
+            if height[right] >= right_max:
+                right_max = height[right]
+            else:
+                water += right_max - height[right]
+            right -= 1
+    return water
+# Time: O(n), Space: O(1)
+# Approach: Two pointers from both ends, track max height on each side
+</pre>
+
+<h3>Strings</h3>
+
+<h4><span class="badge easy">Easy</span> 8. Valid Anagram</h4>
+<pre>
+from collections import Counter
+def is_anagram(s, t):
+    return Counter(s) == Counter(t)
+# Time: O(n), Space: O(1) — at most 26 chars
+</pre>
+
+<h4><span class="badge easy">Easy</span> 9. Valid Palindrome</h4>
+<pre>
+def is_palindrome(s):
+    cleaned = ''.join(c.lower() for c in s if c.isalnum())
+    return cleaned == cleaned[::-1]
+# Time: O(n), Space: O(n)
+</pre>
+
+<h4><span class="badge medium">Medium</span> 10. Longest Substring Without Repeating Characters</h4>
+<pre>
+def length_of_longest_substring(s):
+    char_index = {}
+    max_len = start = 0
+    for i, char in enumerate(s):
+        if char in char_index and char_index[char] >= start:
+            start = char_index[char] + 1
+        char_index[char] = i
+        max_len = max(max_len, i - start + 1)
+    return max_len
+# Time: O(n), Space: O(min(n, 26))
+# Approach: Sliding window with hashmap tracking last index of each char
+</pre>
+
+<h4><span class="badge medium">Medium</span> 11. Group Anagrams</h4>
+<pre>
+from collections import defaultdict
+def group_anagrams(strs):
+    groups = defaultdict(list)
+    for s in strs:
+        key = tuple(sorted(s))
+        groups[key].append(s)
+    return list(groups.values())
+# Time: O(n * k log k), Space: O(n * k)
+</pre>
+
+<h4><span class="badge hard">Hard</span> 12. Minimum Window Substring</h4>
+<pre>
+from collections import Counter
+def min_window(s, t):
+    need = Counter(t)
+    missing = len(t)
+    left = start = end = 0
+    for right, char in enumerate(s, 1):
+        if need[char] > 0:
+            missing -= 1
+        need[char] -= 1
+        if missing == 0:  # all chars found
+            while need[s[left]] < 0:
+                need[s[left]] += 1
+                left += 1
+            if not end or right - left <= end - start:
+                start, end = left, right
+            need[s[left]] += 1
+            missing += 1
+            left += 1
+    return s[start:end]
+# Time: O(n), Space: O(k)
+</pre>
+
+<h3>Hashmap</h3>
+
+<h4><span class="badge easy">Easy</span> 13. First Non-Repeating Character</h4>
+<pre>
+from collections import Counter
+def first_unique(s):
+    count = Counter(s)
+    for i, c in enumerate(s):
+        if count[c] == 1:
+            return i
+    return -1
+</pre>
+
+<h4><span class="badge medium">Medium</span> 14. Top K Frequent Elements</h4>
+<pre>
+from collections import Counter
+def top_k_frequent(nums, k):
+    return [x for x, _ in Counter(nums).most_common(k)]
+# Time: O(n log k) with heap, O(n) with bucket sort
+</pre>
+
+<h4><span class="badge medium">Medium</span> 15. Subarray Sum Equals K</h4>
+<pre>
+from collections import defaultdict
+def subarray_sum(nums, k):
+    count = 0
+    prefix_sum = 0
+    prefix_counts = defaultdict(int)
+    prefix_counts[0] = 1
+    for num in nums:
+        prefix_sum += num
+        count += prefix_counts[prefix_sum - k]
+        prefix_counts[prefix_sum] += 1
+    return count
+# Time: O(n), Space: O(n)
+# Approach: prefix sum + hashmap
+</pre>
+
+<h3>Recursion / Backtracking</h3>
+
+<h4><span class="badge easy">Easy</span> 16. Fibonacci (with memoization)</h4>
+<pre>
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n):
+    if n <= 1: return n
+    return fib(n-1) + fib(n-2)
+# Time: O(n) with memo, O(2^n) without
+</pre>
+
+<h4><span class="badge medium">Medium</span> 17. Generate Parentheses</h4>
+<pre>
+def generate_parenthesis(n):
+    result = []
+    def backtrack(current, open_count, close_count):
+        if len(current) == 2 * n:
+            result.append(current)
+            return
+        if open_count < n:
+            backtrack(current + "(", open_count + 1, close_count)
+        if close_count < open_count:
+            backtrack(current + ")", open_count, close_count + 1)
+    backtrack("", 0, 0)
+    return result
+</pre>
+
+<h4><span class="badge medium">Medium</span> 18. Permutations</h4>
+<pre>
+def permutations(nums):
+    result = []
+    def backtrack(path, remaining):
+        if not remaining:
+            result.append(path[:])
+            return
+        for i in range(len(remaining)):
+            path.append(remaining[i])
+            backtrack(path, remaining[:i] + remaining[i+1:])
+            path.pop()
+    backtrack([], nums)
+    return result
+</pre>
+
+<h4><span class="badge medium">Medium</span> 19. Combination Sum</h4>
+<pre>
+def combination_sum(candidates, target):
+    result = []
+    def backtrack(start, current, remaining):
+        if remaining == 0:
+            result.append(current[:])
+            return
+        if remaining < 0:
+            return
+        for i in range(start, len(candidates)):
+            current.append(candidates[i])
+            backtrack(i, current, remaining - candidates[i])
+            current.pop()
+    backtrack(0, [], target)
+    return result
+</pre>
+
+<h3>Trees</h3>
+
+<h4><span class="badge easy">Easy</span> 20. Max Depth of Binary Tree</h4>
+<pre>
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def max_depth(root):
+    if not root: return 0
+    return 1 + max(max_depth(root.left), max_depth(root.right))
+</pre>
+
+<h4><span class="badge easy">Easy</span> 21. Invert Binary Tree</h4>
+<pre>
+def invert_tree(root):
+    if not root: return None
+    root.left, root.right = invert_tree(root.right), invert_tree(root.left)
+    return root
+</pre>
+
+<h4><span class="badge easy">Easy</span> 22. Same Tree</h4>
+<pre>
+def is_same_tree(p, q):
+    if not p and not q: return True
+    if not p or not q: return False
+    return (p.val == q.val and
+            is_same_tree(p.left, q.left) and
+            is_same_tree(p.right, q.right))
+</pre>
+
+<h4><span class="badge medium">Medium</span> 23. Level Order Traversal (BFS)</h4>
+<pre>
+from collections import deque
+def level_order(root):
+    if not root: return []
+    result = []
+    queue = deque([root])
+    while queue:
+        level = []
+        for _ in range(len(queue)):
+            node = queue.popleft()
+            level.append(node.val)
+            if node.left: queue.append(node.left)
+            if node.right: queue.append(node.right)
+        result.append(level)
+    return result
+</pre>
+
+<h4><span class="badge medium">Medium</span> 24. Validate BST</h4>
+<pre>
+def is_valid_bst(root, min_val=float('-inf'), max_val=float('inf')):
+    if not root: return True
+    if root.val <= min_val or root.val >= max_val:
+        return False
+    return (is_valid_bst(root.left, min_val, root.val) and
+            is_valid_bst(root.right, root.val, max_val))
+</pre>
+
+<h3>Linked List</h3>
+
+<h4><span class="badge easy">Easy</span> 25. Reverse Linked List</h4>
+<pre>
+def reverse_list(head):
+    prev = None
+    while head:
+        next_node = head.next
+        head.next = prev
+        prev = head
+        head = next_node
+    return prev
+# Time: O(n), Space: O(1)
+</pre>
+
+<h4><span class="badge easy">Easy</span> 26. Detect Cycle (Floyd's)</h4>
+<pre>
+def has_cycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+        if slow == fast: return True
+    return False
+</pre>
+
+<h4><span class="badge medium">Medium</span> 27. Merge Two Sorted Lists</h4>
+<pre>
+def merge_lists(l1, l2):
+    dummy = ListNode(0)
+    current = dummy
+    while l1 and l2:
+        if l1.val <= l2.val:
+            current.next = l1
+            l1 = l1.next
+        else:
+            current.next = l2
+            l2 = l2.next
+        current = current.next
+    current.next = l1 or l2
+    return dummy.next
+</pre>
+
+<h3>Stack / Queue</h3>
+
+<h4><span class="badge easy">Easy</span> 28. Valid Parentheses</h4>
+<pre>
+def is_valid(s):
+    stack = []
+    mapping = {')': '(', '}': '{', ']': '['}
+    for char in s:
+        if char in mapping:
+            if not stack or stack[-1] != mapping[char]:
+                return False
+            stack.pop()
+        else:
+            stack.append(char)
+    return len(stack) == 0
+</pre>
+
+<h4><span class="badge medium">Medium</span> 29. Min Stack</h4>
+<pre>
+class MinStack:
+    def __init__(self):
+        self.stack = []
+        self.min_stack = []  # track minimums
+    
+    def push(self, val):
+        self.stack.append(val)
+        if not self.min_stack or val <= self.min_stack[-1]:
+            self.min_stack.append(val)
+    
+    def pop(self):
+        val = self.stack.pop()
+        if val == self.min_stack[-1]:
+            self.min_stack.pop()
+    
+    def get_min(self):
+        return self.min_stack[-1]
+# All operations O(1)
+</pre>
+
+<h4><span class="badge medium">Medium</span> 30. Daily Temperatures</h4>
+<pre>
+def daily_temperatures(temps):
+    result = [0] * len(temps)
+    stack = []  # indices of temps waiting for warmer day
+    for i, temp in enumerate(temps):
+        while stack and temp > temps[stack[-1]]:
+            idx = stack.pop()
+            result[idx] = i - idx
+        stack.append(i)
+    return result
+# Time: O(n), Space: O(n)
+# Approach: Monotonic decreasing stack
+</pre>
+
+<h4><span class="badge medium">Medium</span> 31. Binary Search</h4>
+<pre>
+def binary_search(nums, target):
+    left, right = 0, len(nums) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if nums[mid] == target: return mid
+        elif nums[mid] < target: left = mid + 1
+        else: right = mid - 1
+    return -1
+# Time: O(log n), Space: O(1)
+</pre>
+
+<h4><span class="badge medium">Medium</span> 32. Search in Rotated Sorted Array</h4>
+<pre>
+def search_rotated(nums, target):
+    left, right = 0, len(nums) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if nums[mid] == target: return mid
+        if nums[left] <= nums[mid]:  # left half sorted
+            if nums[left] <= target < nums[mid]:
+                right = mid - 1
+            else:
+                left = mid + 1
+        else:  # right half sorted
+            if nums[mid] < target <= nums[right]:
+                left = mid + 1
+            else:
+                right = mid - 1
+    return -1
+</pre>
+
+<div class="card tip">
+<h4>💡 DSA Interview Tips</h4>
+<ul>
+<li>Always clarify input constraints and edge cases before coding</li>
+<li>State your approach and time/space complexity BEFORE writing code</li>
+<li>Start with brute force, then optimize</li>
+<li>Think aloud — interviewers want to see your thought process</li>
+<li>Test with examples: empty input, single element, duplicates</li>
+<li>Know these patterns: Two Pointers, Sliding Window, HashMap, BFS/DFS, Binary Search, Backtracking, Monotonic Stack</li>
+</ul>
+</div>
+
+</div>
+
+
+<div class="container section" id="cheatsheets">
+<div class="section-header">
+<h2>12 — Cheat Sheets & Quick Revision</h2>
+<p>Top 50 must-remember concepts and quick reference tables.</p>
+</div>
+
+<h3>Python Cheat Sheet</h3>
+<table>
+<thead><tr><th>Concept</th><th>Key Point</th></tr></thead>
+<tbody>
+<tr><td>Mutable vs Immutable</td><td>list/dict/set are mutable; int/str/tuple are immutable</td></tr>
+<tr><td>GIL</td><td>Only one thread runs Python bytecode at a time; use multiprocessing for CPU-bound</td></tr>
+<tr><td>Decorator</td><td>Function that wraps another function; use @functools.wraps</td></tr>
+<tr><td>Generator</td><td>Uses yield, lazy evaluation, memory efficient</td></tr>
+<tr><td>List Comprehension</td><td><code>[x*2 for x in range(10) if x%2==0]</code></td></tr>
+<tr><td>*args, **kwargs</td><td>*args = tuple of positional args; **kwargs = dict of keyword args</td></tr>
+<tr><td>Context Manager</td><td><code>with</code> statement; __enter__ and __exit__ methods</td></tr>
+<tr><td>@property</td><td>Make methods behave like attributes; getter/setter</td></tr>
+<tr><td>collections</td><td>Counter, defaultdict, deque, namedtuple, OrderedDict</td></tr>
+<tr><td>deepcopy vs copy</td><td>copy = shared nested refs; deepcopy = fully independent</td></tr>
+</tbody>
+</table>
+
+<h3>JavaScript Cheat Sheet</h3>
+<table>
+<thead><tr><th>Concept</th><th>Key Point</th></tr></thead>
+<tbody>
+<tr><td>Event Loop</td><td>Call Stack → Microtasks (Promise) → Macrotasks (setTimeout)</td></tr>
+<tr><td>Closure</td><td>Function retains access to outer scope after outer returns</td></tr>
+<tr><td>this</td><td>Regular func: caller object. Arrow func: inherited from outer scope</td></tr>
+<tr><td>== vs ===</td><td>== coerces types; === strict equality. Always use ===</td></tr>
+<tr><td>var/let/const</td><td>var: function-scoped. let/const: block-scoped. const: no reassign</td></tr>
+<tr><td>Spread/Rest</td><td><code>...arr</code> spreads; <code>(...args)</code> collects</td></tr>
+<tr><td>Destructuring</td><td><code>const {a, b} = obj;</code> or <code>const [x, y] = arr;</code></td></tr>
+<tr><td>Map vs Object</td><td>Map: any key type, ordered, has size. Object: string/symbol keys</td></tr>
+<tr><td>Nullish coalescing</td><td><code>x ?? 'default'</code> — only for null/undefined (not 0 or '')</td></tr>
+<tr><td>Optional chaining</td><td><code>obj?.prop?.method?.()</code> — no error if null/undefined</td></tr>
+</tbody>
+</table>
+
+<h3>React Cheat Sheet</h3>
+<table>
+<thead><tr><th>Hook</th><th>Purpose</th><th>When to Use</th></tr></thead>
+<tbody>
+<tr><td>useState</td><td>Local component state</td><td>Any state that triggers re-render</td></tr>
+<tr><td>useEffect</td><td>Side effects (API, subscriptions)</td><td>Fetch data, event listeners, timers</td></tr>
+<tr><td>useMemo</td><td>Memoize expensive value</td><td>Heavy computation, filtering/sorting</td></tr>
+<tr><td>useCallback</td><td>Memoize function reference</td><td>Passing callbacks to React.memo children</td></tr>
+<tr><td>useRef</td><td>Mutable ref (no re-render)</td><td>DOM access, previous value, render count</td></tr>
+<tr><td>useContext</td><td>Consume context value</td><td>Theme, auth, locale — global state</td></tr>
+<tr><td>useReducer</td><td>Complex state logic</td><td>Multiple related state values</td></tr>
+</tbody>
+</table>
+
+<h3>SQL Quick Reference</h3>
+<table>
+<thead><tr><th>Operation</th><th>Syntax</th></tr></thead>
+<tbody>
+<tr><td>Filter</td><td><code>WHERE column = value</code></td></tr>
+<tr><td>Sort</td><td><code>ORDER BY column DESC</code></td></tr>
+<tr><td>Group + Filter</td><td><code>GROUP BY col HAVING COUNT(*) > 5</code></td></tr>
+<tr><td>Join</td><td><code>JOIN table2 ON t1.id = t2.fk_id</code></td></tr>
+<tr><td>Subquery</td><td><code>WHERE id IN (SELECT ...)</code></td></tr>
+<tr><td>Window</td><td><code>RANK() OVER (PARTITION BY ... ORDER BY ...)</code></td></tr>
+<tr><td>CTE</td><td><code>WITH name AS (SELECT ...) SELECT * FROM name</code></td></tr>
+<tr><td>Upsert</td><td><code>INSERT ... ON CONFLICT DO UPDATE</code></td></tr>
+</tbody>
+</table>
+
+<h3>MongoDB Quick Reference</h3>
+<table>
+<thead><tr><th>Operation</th><th>Syntax</th></tr></thead>
+<tbody>
+<tr><td>Find</td><td><code>db.col.find({age: {$gte: 18}})</code></td></tr>
+<tr><td>Update</td><td><code>db.col.updateOne({_id}, {$set: {name: "X"}})</code></td></tr>
+<tr><td>Aggregate</td><td><code>db.col.aggregate([{$match}, {$group}, {$sort}])</code></td></tr>
+<tr><td>Index</td><td><code>db.col.createIndex({field: 1})</code></td></tr>
+<tr><td>Lookup (JOIN)</td><td><code>{$lookup: {from, localField, foreignField, as}}</code></td></tr>
+<tr><td>Text Search</td><td><code>{$text: {$search: "keyword"}}</code></td></tr>
+</tbody>
+</table>
+
+<h3>HTTP Status Codes</h3>
+<table>
+<thead><tr><th>Code</th><th>Meaning</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>200</td><td>OK</td><td>Successful GET/PUT/PATCH</td></tr>
+<tr><td>201</td><td>Created</td><td>Successful POST (resource created)</td></tr>
+<tr><td>204</td><td>No Content</td><td>Successful DELETE</td></tr>
+<tr><td>400</td><td>Bad Request</td><td>Invalid input/validation error</td></tr>
+<tr><td>401</td><td>Unauthorized</td><td>Not authenticated</td></tr>
+<tr><td>403</td><td>Forbidden</td><td>Authenticated but no permission</td></tr>
+<tr><td>404</td><td>Not Found</td><td>Resource doesn't exist</td></tr>
+<tr><td>409</td><td>Conflict</td><td>Duplicate resource</td></tr>
+<tr><td>422</td><td>Unprocessable</td><td>Valid syntax but semantic error</td></tr>
+<tr><td>429</td><td>Too Many Requests</td><td>Rate limited</td></tr>
+<tr><td>500</td><td>Server Error</td><td>Unhandled exception</td></tr>
+</tbody>
+</table>
+
+<h3>Top 50 Must-Remember Concepts</h3>
+
+<div class="cheat-grid">
+<div class="cheat-item"><h5>1. Big O Notation</h5><p>O(1) < O(log n) < O(n) < O(n log n) < O(n²) < O(2ⁿ)</p></div>
+<div class="cheat-item"><h5>2. ACID</h5><p>Atomicity, Consistency, Isolation, Durability</p></div>
+<div class="cheat-item"><h5>3. REST Principles</h5><p>Stateless, Resource-based, HTTP methods, JSON</p></div>
+<div class="cheat-item"><h5>4. CAP Theorem</h5><p>Choose 2: Consistency, Availability, Partition tolerance</p></div>
+<div class="cheat-item"><h5>5. SOLID Principles</h5><p>Single Resp, Open/Closed, Liskov, Interface Seg, Dep Inversion</p></div>
+<div class="cheat-item"><h5>6. DRY</h5><p>Don't Repeat Yourself — extract common code</p></div>
+<div class="cheat-item"><h5>7. JWT Structure</h5><p>Header.Payload.Signature (Base64 encoded)</p></div>
+<div class="cheat-item"><h5>8. SQL vs NoSQL</h5><p>SQL: relations, ACID. NoSQL: flexible, scalable</p></div>
+<div class="cheat-item"><h5>9. Indexing</h5><p>B-tree speeds reads, slows writes. Use on WHERE/JOIN cols</p></div>
+<div class="cheat-item"><h5>10. N+1 Problem</h5><p>Fix: select_related (FK) / prefetch_related (M2M)</p></div>
+<div class="cheat-item"><h5>11. Event Loop</h5><p>Stack → Microtasks → Macrotasks</p></div>
+<div class="cheat-item"><h5>12. Virtual DOM</h5><p>Diff old/new VDOM, batch update real DOM</p></div>
+<div class="cheat-item"><h5>13. Closure</h5><p>Function remembers its outer scope variables</p></div>
+<div class="cheat-item"><h5>14. Hoisting</h5><p>var: undefined. let/const: TDZ. function: fully hoisted</p></div>
+<div class="cheat-item"><h5>15. GIL</h5><p>CPython: 1 thread at a time. Use multiprocessing for CPU</p></div>
+<div class="cheat-item"><h5>16. ORM</h5><p>Maps objects to DB tables. Django ORM, SQLAlchemy</p></div>
+<div class="cheat-item"><h5>17. Middleware</h5><p>Code that runs before/after every request</p></div>
+<div class="cheat-item"><h5>18. CORS</h5><p>Browser security: controls cross-origin requests</p></div>
+<div class="cheat-item"><h5>19. WebSocket</h5><p>Persistent bidirectional connection for real-time</p></div>
+<div class="cheat-item"><h5>20. Docker</h5><p>Containerize app + deps. Consistent environments</p></div>
+<div class="cheat-item"><h5>21. CI/CD</h5><p>Auto build, test, deploy on every code push</p></div>
+<div class="cheat-item"><h5>22. Load Balancer</h5><p>Distributes traffic across servers</p></div>
+<div class="cheat-item"><h5>23. Caching</h5><p>Redis/Memcached for hot data. TTL for expiry</p></div>
+<div class="cheat-item"><h5>24. Message Queue</h5><p>Async processing: RabbitMQ, Kafka, Redis</p></div>
+<div class="cheat-item"><h5>25. Microservices</h5><p>Independent services, own DB, API communication</p></div>
+<div class="cheat-item"><h5>26. Two Pointers</h5><p>Pattern for sorted arrays. O(n) instead of O(n²)</p></div>
+<div class="cheat-item"><h5>27. Sliding Window</h5><p>Fixed/variable window for substring/subarray problems</p></div>
+<div class="cheat-item"><h5>28. Binary Search</h5><p>O(log n) search on sorted data</p></div>
+<div class="cheat-item"><h5>29. HashMap</h5><p>O(1) lookup. Counter, defaultdict in Python</p></div>
+<div class="cheat-item"><h5>30. BFS vs DFS</h5><p>BFS: level order (queue). DFS: depth first (stack/recursion)</p></div>
+<div class="cheat-item"><h5>31. Recursion</h5><p>Base case + recursive case. Watch stack overflow</p></div>
+<div class="cheat-item"><h5>32. Memoization</h5><p>Cache results of expensive calls. @lru_cache</p></div>
+<div class="cheat-item"><h5>33. Pydantic</h5><p>Data validation via type hints. Used by FastAPI</p></div>
+<div class="cheat-item"><h5>34. ASGI vs WSGI</h5><p>ASGI: async. WSGI: sync. FastAPI=ASGI, Django=WSGI (mostly)</p></div>
+<div class="cheat-item"><h5>35. React.memo</h5><p>Skip re-render if props unchanged</p></div>
+<div class="cheat-item"><h5>36. Redux Flow</h5><p>Dispatch Action → Reducer → New State → Re-render</p></div>
+<div class="cheat-item"><h5>37. Aggregation Pipeline</h5><p>MongoDB: $match → $group → $sort → $project</p></div>
+<div class="cheat-item"><h5>38. Window Functions</h5><p>SQL: RANK, ROW_NUMBER, LAG, LEAD over partitions</p></div>
+<div class="cheat-item"><h5>39. Transactions</h5><p>BEGIN → operations → COMMIT/ROLLBACK</p></div>
+<div class="cheat-item"><h5>40. Race Condition</h5><p>Concurrent access → unpredictable results. Fix: locks</p></div>
+<div class="cheat-item"><h5>41. Idempotency</h5><p>Same request = same result. GET/PUT/DELETE are idempotent</p></div>
+<div class="cheat-item"><h5>42. SSR vs CSR</h5><p>SSR: server renders HTML. CSR: browser renders with JS</p></div>
+<div class="cheat-item"><h5>43. OAuth 2.0</h5><p>Authorization framework: auth code, client credentials flows</p></div>
+<div class="cheat-item"><h5>44. Rate Limiting</h5><p>Prevent abuse: Token Bucket, Sliding Window algorithms</p></div>
+<div class="cheat-item"><h5>45. Debounce vs Throttle</h5><p>Debounce: wait for pause. Throttle: limit frequency</p></div>
+<div class="cheat-item"><h5>46. SQL Injection</h5><p>Fix: parameterized queries, never concat user input</p></div>
+<div class="cheat-item"><h5>47. XSS</h5><p>Fix: escape output, Content-Security-Policy, sanitize input</p></div>
+<div class="cheat-item"><h5>48. Normalization</h5><p>Reduce redundancy: 1NF, 2NF, 3NF. Split into related tables</p></div>
+<div class="cheat-item"><h5>49. Horizontal Scaling</h5><p>Add more servers. Requires stateless design</p></div>
+<div class="cheat-item"><h5>50. Git Rebase vs Merge</h5><p>Rebase: linear history. Merge: preserves branches</p></div>
+</div>
+
+<h3>DSA Pattern Recognition</h3>
+<table>
+<thead><tr><th>If You See...</th><th>Think About...</th><th>Data Structure</th></tr></thead>
+<tbody>
+<tr><td>Find pair with sum</td><td>Two Pointers / HashMap</td><td>Set / Dict</td></tr>
+<tr><td>Contiguous subarray</td><td>Sliding Window / Prefix Sum</td><td>Array</td></tr>
+<tr><td>Find k-th largest</td><td>Heap / Quick Select</td><td>Heap</td></tr>
+<tr><td>Tree traversal</td><td>BFS (queue) / DFS (recursion)</td><td>Queue / Stack</td></tr>
+<tr><td>Shortest path</td><td>BFS (unweighted) / Dijkstra</td><td>Queue / Heap</td></tr>
+<tr><td>Generate all combinations</td><td>Backtracking</td><td>Recursion</td></tr>
+<tr><td>Overlapping subproblems</td><td>Dynamic Programming</td><td>Array / Dict</td></tr>
+<tr><td>Sorted + search</td><td>Binary Search</td><td>Array</td></tr>
+<tr><td>Matching brackets/pairs</td><td>Stack</td><td>Stack</td></tr>
+<tr><td>Top/bottom K elements</td><td>Heap / Sorting</td><td>Heap</td></tr>
+</tbody>
+</table>
+
+</div>
+
+
+<div class="container section" style="text-align:center; padding: 80px 0;">
+<h2 style="color:#818cf8; margin-bottom:16px;">End of Guide</h2>
+<p style="color:#94a3b8;">Good luck with your interviews! Practice consistently and you will succeed.</p>
+</div>
+</body>
+</html>
