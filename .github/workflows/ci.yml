@@ -18,7 +18,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. Build & start containers
+      # 3. Create .env for CI (not in repo — .gitignore)
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          SECRET_KEY=ci-test-secret-key
+          DEBUG=True
+          ALLOWED_HOSTS=*
+          REDIS_URL=redis://redis:6379/0
+          CHANNEL_LAYER_BACKEND=redis
+          EOF
+
+      # 4. Build & start containers
       - name: Build and start containers
         run: docker compose up --build -d
 
