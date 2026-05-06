@@ -65,10 +65,6 @@ export default function LeaveRequestList() {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 50;
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [tab, statusFilter, searchQuery, balanceSearch, departmentFilter]);
-
     // ─── Fetch data via Redux ───
     useEffect(() => {
         if (tab === 'balances') {
@@ -89,7 +85,7 @@ export default function LeaveRequestList() {
         if (tab !== 'all') params.tab = tab;
         if (statusFilter !== 'all') params.status = statusFilter;
         setSearchParams(params, { replace: true });
-    }, [tab, statusFilter]);
+    }, [tab, statusFilter, setSearchParams]);
 
     const handleAction = async (id, action) => {
         try {
@@ -247,16 +243,16 @@ export default function LeaveRequestList() {
             <div className="glass-panel dark:bg-[#111827]/40 flex flex-wrap gap-3 justify-between items-center p-3 rounded-xl border-slate-200 dark:border-slate-800">
                 {/* Tabs */}
                 <div className="flex flex-nowrap gap-1 bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-1 w-full xl:w-auto overflow-x-auto no-scrollbar shrink-0">
-                    <TabButton active={tab === 'all'} onClick={() => { setTab('all'); setStatusFilter('all'); }}>
+                    <TabButton active={tab === 'all'} onClick={() => { setCurrentPage(1); setTab('all'); setStatusFilter('all'); }}>
                         {hasRole('admin', 'hr', 'manager') ? 'All Requests' : 'All Requests'}
                     </TabButton>
                     {!hasRole('admin') && (
-                        <TabButton active={tab === 'my'} onClick={() => { setTab('my'); setStatusFilter('all'); }}>
+                        <TabButton active={tab === 'my'} onClick={() => { setCurrentPage(1); setTab('my'); setStatusFilter('all'); }}>
                             My Leaves
                         </TabButton>
                     )}
                     {hasRole('admin', 'hr') && (
-                        <TabButton active={tab === 'balances'} onClick={() => setTab('balances')}>
+                        <TabButton active={tab === 'balances'} onClick={() => { setCurrentPage(1); setTab('balances'); }}>
                             <Scale className="w-3.5 h-3.5 mr-1.5 inline-block" />
                             Leave Balances
                         </TabButton>
@@ -270,7 +266,7 @@ export default function LeaveRequestList() {
                         <div className="relative min-w-[140px] shrink-0">
                             <select
                                 value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
+                                onChange={(e) => { setCurrentPage(1); setStatusFilter(e.target.value); }}
                                 className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                             >
                                 <option value="all">All Status</option>
@@ -285,7 +281,7 @@ export default function LeaveRequestList() {
                             <div className="relative min-w-[180px] shrink-0">
                                 <select
                                     value={departmentFilter}
-                                    onChange={(e) => setDepartmentFilter(e.target.value)}
+                                    onChange={(e) => { setCurrentPage(1); setDepartmentFilter(e.target.value); }}
                                     className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                                 >
                                     <option value="All">All Departments</option>
@@ -304,7 +300,7 @@ export default function LeaveRequestList() {
                                 type="text"
                                 placeholder="Search..."
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(e) => { setCurrentPage(1); setSearchQuery(e.target.value); }}
                                 className="block w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-[#1E293B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 dark:text-white font-medium"
                             />
                         </div>
@@ -315,7 +311,7 @@ export default function LeaveRequestList() {
                         <div className="relative min-w-[180px] shrink-0">
                             <select
                                 value={departmentFilter}
-                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                                onChange={(e) => { setCurrentPage(1); setDepartmentFilter(e.target.value); }}
                                 className="appearance-none w-full bg-white dark:bg-[#1E293B] border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] cursor-pointer"
                             >
                                 <option value="All">All Departments</option>
@@ -332,7 +328,7 @@ export default function LeaveRequestList() {
                                 type="text"
                                 placeholder="Search employee or department..."
                                 value={balanceSearch}
-                                onChange={(e) => setBalanceSearch(e.target.value)}
+                                onChange={(e) => { setCurrentPage(1); setBalanceSearch(e.target.value); }}
                                 className="block w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-[#1E293B] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] sm:text-sm text-slate-800 dark:text-white font-medium"
                             />
                         </div>

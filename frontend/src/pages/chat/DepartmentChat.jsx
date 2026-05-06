@@ -30,13 +30,13 @@ export default function DepartmentChat() {
     const [departments, setDepartments] = useState([]);
     const [activeDept, setActiveDept] = useState(null);
     const [input, setInput] = useState('');
-    const [ws, setWs] = useState(null);
 
     const channelKey = activeDept ? `dept-${activeDept.id}` : null;
     const messages = useSelector(selectMessages(channelKey || '__none__'));
     const loadingHistory = useSelector(selectLoadingHistory(channelKey || '__none__'));
 
     const messagesEndRef = useRef(null);
+    const wsRef = useRef(null);
 
     // 1. Fetch departments based on role
     useEffect(() => {
@@ -95,10 +95,13 @@ export default function DepartmentChat() {
             }));
         };
 
-        setWs(socket);
+        wsRef.current = socket;
 
         return () => {
-            if (socket) socket.close();
+            socket.close();
+            if (wsRef.current === socket) {
+                wsRef.current = null;
+            }
         };
     }, [activeDept, dispatch]);
 
@@ -109,8 +112,9 @@ export default function DepartmentChat() {
 
     const handleSend = (e) => {
         e.preventDefault();
-        if (!input.trim() || !ws) return;
-        ws.send(JSON.stringify({ message: input.trim() }));
+        const socket = wsRef.current;
+        if (!input.trim() || !socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(JSON.stringify({ message: input.trim() }));
         setInput('');
     };
 

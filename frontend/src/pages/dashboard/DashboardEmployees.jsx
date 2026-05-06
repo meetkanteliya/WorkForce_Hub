@@ -14,7 +14,7 @@ export default function DashboardEmployees() {
 
     useEffect(() => {
         dispatch(fetchDashboardEmployees({ page, search, role: roleFilter }));
-    }, [page, roleFilter, dispatch]);
+    }, [page, search, roleFilter, dispatch]);
 
     const handleSearch = (e) => {
         e.preventDefault();

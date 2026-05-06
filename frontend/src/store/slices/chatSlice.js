@@ -119,6 +119,18 @@ const chatSlice = createSlice({
             }
         },
 
+        updateMessageReactions(state, action) {
+            const { key, messageId, reactions } = action.payload;
+            ensureChannel(state, key);
+            const idx = state.messages[key].findIndex((m) => m.id === messageId);
+            if (idx !== -1) {
+                state.messages[key][idx] = {
+                    ...state.messages[key][idx],
+                    reactions: reactions || {},
+                };
+            }
+        },
+
         /**
          * optimisticDelete – marks a message as deleted immediately.
          * payload: { key, messageId, deletedBy }
@@ -254,6 +266,7 @@ const chatSlice = createSlice({
 export const {
     addMessage,
     updateMessage,
+    updateMessageReactions,
     optimisticDelete,
     rollbackDelete,
     setTypingUser,

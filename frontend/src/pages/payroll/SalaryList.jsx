@@ -25,7 +25,6 @@ export default function SalaryList() {
 
     useEffect(() => {
         dispatch(fetchSalaries({ tab }));
-        setCurrentPage(1);
     }, [tab, dispatch]);
 
     const totalItems = salaries.length;
@@ -51,14 +50,14 @@ export default function SalaryList() {
             {/* Tabs */}
             <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-6 w-fit">
                 <button
-                    onClick={() => setTab('all')}
+                    onClick={() => { setCurrentPage(1); setTab('all'); }}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                         }`}
                 >
                     {hasRole('admin', 'hr', 'manager') ? 'All Records' : 'All'}
                 </button>
                 <button
-                    onClick={() => setTab('my')}
+                    onClick={() => { setCurrentPage(1); setTab('my'); }}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'my' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                         }`}
                 >

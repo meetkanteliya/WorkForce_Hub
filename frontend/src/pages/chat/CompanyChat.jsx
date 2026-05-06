@@ -8,6 +8,7 @@ import {
   fetchMembers,
   addMessage,
   updateMessage,
+  updateMessageReactions,
   optimisticDelete,
   setTypingUser,
   incrementUnread,
@@ -17,7 +18,7 @@ import {
   selectTypingUsers,
   selectUnreadCount,
 } from '../../store/slices/chatSlice';
-import { Send, MessageSquare, Clock, Paperclip, Users, Trash2, Shield, Hash, X, FileText, Download, MoreHorizontal, Copy, Reply, Smile } from 'lucide-react';
+import { Send, MessageSquare, Clock, Paperclip, Users, Trash2, Shield, Hash, X, FileText, Download, MoreHorizontal, Copy, Reply } from 'lucide-react';
 
 function getBackendOrigin() {
   return import.meta.env.VITE_BACKEND_ORIGIN || 'http://localhost:8000';
@@ -64,14 +65,14 @@ export default function CompanyChat() {
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
-  const [hoveredMsgId, setHoveredMsgId] = useState(null);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [contextMenuId, setContextMenuId] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
-  const [reactionOverrides, setReactionOverrides] = useState({});
   const inputRef = useRef(null);
+  const showLegacyReactionBar = false;
   const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
 
   const socketRef = useRef(null);
@@ -137,9 +138,10 @@ export default function CompanyChat() {
         }
 
         if (data.type === "company_reaction_update" && data.message_id) {
-          setReactionOverrides(prev => ({
-            ...prev,
-            [data.message_id]: data.reactions || {},
+          dispatch(updateMessageReactions({
+            key: CHANNEL_KEY,
+            messageId: data.message_id,
+            reactions: data.reactions || {},
           }));
         }
       };
@@ -211,7 +213,7 @@ export default function CompanyChat() {
 
   const canDelete = (msg) => {
     const senderId = msg?.sender?.id;
-    return senderId && (senderId === meId || user?.role === 'admin');
+    return senderId && (senderId === meId || user?.role === 'admin' || user?.role === 'hr');
   };
 
   const handleDeleteMessage = async (msg) => {
@@ -234,7 +236,7 @@ export default function CompanyChat() {
       }));
     }
     setContextMenuId(null);
-    setHoveredMsgId(null);
+    setActiveReactionMsgId(null);
     // Clear reply if the deleted message was being replied to
     if (replyTo?.id === id) setReplyTo(null);
   };
@@ -259,7 +261,7 @@ export default function CompanyChat() {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: 'reaction', message_id: msgId, emoji }));
-    setHoveredMsgId(null);
+    setActiveReactionMsgId(null);
     setContextMenuId(null);
   };
 
@@ -313,17 +315,17 @@ export default function CompanyChat() {
 
   const typingList = Object.values(typingUsers);
 
-  // Click outside to close action bar
+  // Click outside to close reaction popup
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (hoveredMsgId && !e.target.closest('[data-msg-actions]')) {
-        setHoveredMsgId(null);
+      if (activeReactionMsgId && !e.target.closest('[data-msg-actions]')) {
+        setActiveReactionMsgId(null);
         setContextMenuId(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [hoveredMsgId]);
+  }, [activeReactionMsgId]);
 
   // Group messages by date
   const groupedMessages = useMemo(() => {
@@ -419,7 +421,9 @@ export default function CompanyChat() {
               const isDeleted = !!msg.is_deleted;
               // Only the admin who deleted the message sees "deleted by admin"
               const iAmTheDeleter = isDeleted && msg.deleted_by && msg.deleted_by.id === meId && msg.deleted_by.id !== sender.id;
-              const isHovered = hoveredMsgId === msg.id;
+              const isReactionMenuOpen = activeReactionMsgId === msg.id;
+              const reactionEntries = Object.entries(msg.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length > 0);
+              const hasReactions = reactionEntries.length > 0;
 
               const pic = sender.profile_picture
                 ? `${getBackendOrigin()}${sender.profile_picture}`
@@ -447,9 +451,17 @@ export default function CompanyChat() {
                   <div
                     className={`max-w-[75%] sm:max-w-[65%] relative ${isMe ? 'items-end' : 'items-start'}`}
                     data-msg-actions
+                    onMouseEnter={() => {
+                      if (!isDeleted) setActiveReactionMsgId(msg.id);
+                    }}
+                    onMouseLeave={() => {
+                      if (contextMenuId !== msg.id) {
+                        setActiveReactionMsgId((current) => (current === msg.id ? null : current));
+                      }
+                    }}
                     onClick={(e) => {
                       if (isDeleted || e.target.closest('a') || e.target.closest('button')) return;
-                      setHoveredMsgId(hoveredMsgId === msg.id ? null : msg.id);
+                      setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
                       setContextMenuId(null);
                     }}
                   >
@@ -483,6 +495,60 @@ export default function CompanyChat() {
                         : ''
                       }`}
                     >
+                      {!isDeleted && isReactionMenuOpen && (
+                        <div
+                          className={`absolute -top-12 ${isMe ? 'right-0' : 'left-0'} z-20`}
+                          data-msg-actions
+                        >
+                          <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 px-2 py-1 shadow-xl backdrop-blur-sm">
+                            {QUICK_EMOJIS.map(emoji => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleReaction(msg.id, emoji); }}
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-sm transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                title={emoji}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                            <div className="mx-0.5 h-5 w-px bg-slate-200 dark:bg-slate-700" />
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setContextMenuId(contextMenuId === msg.id ? null : msg.id);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-white"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+
+                              {contextMenuId === msg.id && (
+                                <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50`} data-msg-actions>
+                                  <button onClick={(e) => { e.stopPropagation(); handleCopy(msg); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                                    <Copy className="w-3.5 h-3.5" /> Copy
+                                  </button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleReply(msg); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                                    <Reply className="w-3.5 h-3.5" /> Reply
+                                  </button>
+                                  {canDelete(msg) && (
+                                    <>
+                                      <div className="h-px bg-slate-100 dark:bg-slate-700 my-0.5" />
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg); setContextMenuId(null); }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Reply Quote */}
                       {msg.replyTo && (
                         <div className={`mb-1.5 px-2.5 py-1.5 rounded-lg border-l-2 text-[11px] ${isMe ? 'bg-white/10 border-white/40' : 'bg-slate-50 dark:bg-slate-800 border-emerald-400'}`}>
@@ -549,31 +615,30 @@ export default function CompanyChat() {
                       </div>
                     </div>
 
-                    {/* Reaction Pills */}
-                    {(() => {
-                      const msgReactions = reactionOverrides[msg.id] !== undefined
-                        ? reactionOverrides[msg.id]
-                        : (msg.reactions || {});
-                      const hasReactions = Object.keys(msgReactions).length > 0;
-                      if (!hasReactions) return null;
-                      return (
-                        <div className={`flex flex-wrap gap-1 mt-1 ${isMe ? 'justify-end' : ''}`}>
-                          {Object.entries(msgReactions).map(([emoji, users]) => (
-                            <button key={emoji} onClick={() => handleReaction(msg.id, emoji)}
-                              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-all ${users.includes(meId)
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30'
-                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
+                    {hasReactions && (
+                      <div className={`relative mt-1 flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <div className="flex flex-wrap gap-1">
+                          {reactionEntries.map(([emoji, users]) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReaction(msg.id, emoji)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] shadow-sm transition-all ${users.includes(meId)
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                }`}
+                            >
                               <span>{emoji}</span>
-                              <span className="text-[10px] font-medium text-slate-500">{users.length}</span>
+                              <span className="font-semibold">{users.length}</span>
                             </button>
                           ))}
                         </div>
-                      );
-                    })()}
+                      </div>
+                    )}
                   </div>
 
                   {/* ─── Click Action Bar (Emoji + 3 dots) ─── */}
-                  {!isDeleted && isHovered && (
+                  {showLegacyReactionBar && !isDeleted && isReactionMenuOpen && (
                     <div className={`flex items-center self-center gap-0.5 ${isMe ? 'order-first' : ''}`} data-msg-actions>
                       <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-1 py-0.5">
                         {/* Quick Emoji Reactions */}
@@ -621,7 +686,7 @@ export default function CompanyChat() {
                   )}
 
                   {/* Deleted messages show no action bar — only a subtle indicator on hover */}
-                  {isDeleted && isHovered && (
+                  {isDeleted && isReactionMenuOpen && (
                     <div className={`flex items-center self-center ${isMe ? 'order-first' : ''}`}>
                       <span className="text-[10px] text-slate-400 dark:text-slate-600 italic select-none px-2">
                         deleted
@@ -697,14 +762,14 @@ export default function CompanyChat() {
                 value={input}
                 onChange={(e) => onInputChange(e.target.value)}
                 placeholder="Type a message... (use @ to mention)"
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-xl 
-                  text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 
+                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-xl
+                  text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600
                   focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
               />
             </div>
 
             <button type="submit" disabled={isUploading || !input.trim()}
-              className="p-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-500/20 
+              className="p-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl shadow-lg shadow-emerald-500/20
                 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:shadow-none disabled:translate-y-0 shrink-0">
               {isUploading ? (<div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />) : (<Send className="w-5 h-5" />)}
             </button>

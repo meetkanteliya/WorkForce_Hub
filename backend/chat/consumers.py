@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from django.db import IntegrityError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageReaction
@@ -236,16 +237,17 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
             message_id = data.get("message_id")
             emoji = data.get("emoji")
             if message_id and emoji:
-                await self.toggle_reaction(self.user.id, message_id, emoji)
-                reactions = await self.get_message_reactions(message_id)
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "company_reaction_update",
-                        "message_id": message_id,
-                        "reactions": reactions,
-                    },
-                )
+                updated = await self.toggle_reaction(self.user.id, message_id, emoji)
+                if updated:
+                    reactions = await self.get_message_reactions(message_id)
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            "type": "company_reaction_update",
+                            "message_id": message_id,
+                            "reactions": reactions,
+                        },
+                    )
             return
 
         # default: message
@@ -349,12 +351,27 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def toggle_reaction(self, user_id, message_id, emoji):
-        """Toggle a reaction: add if not exists, remove if exists."""
-        obj, created = CompanyChatMessageReaction.objects.get_or_create(
-            message_id=message_id, user_id=user_id, emoji=emoji,
-        )
+        """Toggle a reaction if the message exists and is not deleted."""
+        message = CompanyChatMessage.objects.filter(
+            id=message_id,
+            deleted_at__isnull=True,
+        ).only("id").first()
+        if not message:
+            return False
+
+        try:
+            obj, created = CompanyChatMessageReaction.objects.get_or_create(
+                message_id=message.id,
+                user_id=user_id,
+                emoji=emoji,
+            )
+        except IntegrityError:
+            logger.debug("Failed to toggle reaction for message_id=%s", message_id)
+            return False
+
         if not created:
             obj.delete()
+        return True
 
     @database_sync_to_async
     def get_message_reactions(self, message_id):
