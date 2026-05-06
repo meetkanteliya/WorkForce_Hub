@@ -3,7 +3,7 @@ import logging
 import os
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import ChatMessage, CompanyChatMessage
+from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageReaction
 from employees.models import Department
 from accounts.models import User
 import urllib.parse
@@ -232,6 +232,22 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
             )
             return
 
+        if event_type == "reaction":
+            message_id = data.get("message_id")
+            emoji = data.get("emoji")
+            if message_id and emoji:
+                await self.toggle_reaction(self.user.id, message_id, emoji)
+                reactions = await self.get_message_reactions(message_id)
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        "type": "company_reaction_update",
+                        "message_id": message_id,
+                        "reactions": reactions,
+                    },
+                )
+            return
+
         # default: message
         message = (data.get("message") or "").strip()
         if not message:
@@ -281,6 +297,13 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
             "payload": event.get("payload"),
         }))
 
+    async def company_reaction_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "company_reaction_update",
+            "message_id": event.get("message_id"),
+            "reactions": event.get("reactions"),
+        }))
+
     @database_sync_to_async
     def get_user_from_token(self, token):
         if not token: return None
@@ -323,3 +346,23 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
         from .serializers import CompanyChatMessageSerializer
         msg = CompanyChatMessage.objects.select_related("sender").get(id=msg_id)
         return CompanyChatMessageSerializer(msg).data
+
+    @database_sync_to_async
+    def toggle_reaction(self, user_id, message_id, emoji):
+        """Toggle a reaction: add if not exists, remove if exists."""
+        obj, created = CompanyChatMessageReaction.objects.get_or_create(
+            message_id=message_id, user_id=user_id, emoji=emoji,
+        )
+        if not created:
+            obj.delete()
+
+    @database_sync_to_async
+    def get_message_reactions(self, message_id):
+        """Return reactions as {emoji: [user_id, ...]} dict."""
+        qs = CompanyChatMessageReaction.objects.filter(
+            message_id=message_id
+        ).values_list("emoji", "user_id")
+        result = {}
+        for emoji, user_id in qs:
+            result.setdefault(emoji, []).append(user_id)
+        return result

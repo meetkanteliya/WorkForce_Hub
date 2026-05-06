@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageRead
+from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageRead, CompanyChatMessageReaction
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.CharField(source='sender.username', read_only=True)
@@ -28,7 +28,7 @@ class ChatEmployeePublicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "full_name", "profile_picture", "is_active")
+        fields = ("id", "username", "role", "full_name", "profile_picture", "is_active")
 
     def get_full_name(self, obj):
         name = (obj.get_full_name() or "").strip()
@@ -50,6 +50,7 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
     deleted_at = serializers.DateTimeField(read_only=True)
     deleted_by = ChatEmployeePublicSerializer(read_only=True)
     read_by_count = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = CompanyChatMessage
@@ -66,6 +67,7 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
             "deleted_at",
             "deleted_by",
             "read_by_count",
+            "reactions",
         )
 
     def get_attachment_url(self, obj):
@@ -91,3 +93,21 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
     def get_read_by_count(self, obj):
         # Exclude sender from "seen by"
         return CompanyChatMessageRead.objects.filter(message=obj).exclude(user_id=obj.sender_id).count()
+
+    def get_reactions(self, obj):
+        """Return reactions as {emoji: [user_id, ...]} dict."""
+        qs = CompanyChatMessageReaction.objects.filter(message=obj).values_list("emoji", "user_id")
+        result = {}
+        for emoji, user_id in qs:
+            result.setdefault(emoji, []).append(user_id)
+        return result
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Sanitize deleted messages — hide content & attachment data
+        if instance.is_deleted:
+            data["content"] = ""
+            data["attachment_url"] = None
+            data["attachment_name"] = ""
+            data["attachment_mime"] = ""
+        return data

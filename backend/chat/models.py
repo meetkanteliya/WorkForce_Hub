@@ -80,3 +80,28 @@ class CompanyChatMessageRead(models.Model):
             models.Index(fields=["message", "read_at"]),
             models.Index(fields=["user", "read_at"]),
         ]
+
+
+class CompanyChatMessageReaction(models.Model):
+    message = models.ForeignKey(
+        CompanyChatMessage,
+        on_delete=models.CASCADE,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="company_message_reactions",
+    )
+    emoji = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("message", "user", "emoji")
+        indexes = [
+            models.Index(fields=["message"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} reacted {self.emoji} on msg#{self.message_id}"
+

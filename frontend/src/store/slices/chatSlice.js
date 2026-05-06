@@ -121,14 +121,22 @@ const chatSlice = createSlice({
 
         /**
          * optimisticDelete – marks a message as deleted immediately.
-         * payload: { key, messageId }
+         * payload: { key, messageId, deletedBy }
          */
         optimisticDelete(state, action) {
-            const { key, messageId } = action.payload;
+            const { key, messageId, deletedBy } = action.payload;
             ensureChannel(state, key);
             const idx = state.messages[key].findIndex((m) => m.id === messageId);
             if (idx !== -1) {
-                state.messages[key][idx] = { ...state.messages[key][idx], is_deleted: true };
+                state.messages[key][idx] = {
+                    ...state.messages[key][idx],
+                    is_deleted: true,
+                    deleted_by: deletedBy || null,
+                    content: '',
+                    attachment_url: null,
+                    attachment_name: '',
+                    attachment_mime: '',
+                };
             }
             if (!state.deletingIds.includes(messageId)) {
                 state.deletingIds.push(messageId);
