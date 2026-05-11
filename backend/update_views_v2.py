@@ -1,43 +1,9 @@
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
-from django.db import transaction
+import re
 
-from .models import LeaveType, LeaveRequest, LeaveBalance
-from .serializers import (
-    LeaveTypeSerializer,
-    LeaveRequestSerializer,
-    LeaveBalanceSerializer,
-    LeaveBalanceWriteSerializer,
-)
-from accounts.permissions import IsAdmin, IsAdminOrHR, IsManagerOrAbove
-from accounts.models import User
-from dashboard.models import AuditLog, Notification
-from datetime import datetime, timedelta
-from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
+with open("leaves/views.py", "r", encoding="utf-8") as f:
+    code = f.read()
 
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 50
-    page_size_query_param = 'page_size'
-    max_page_size = 1000
-
-
-
-class LeaveTypeViewSet(ModelViewSet):
-    queryset = LeaveType.objects.all()
-    serializer_class = LeaveTypeSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy"]:
-            return [IsAdminOrHR()]
-        return super().get_permissions()
-
-
-import datetime as dt
+split_leave_function = """import datetime as dt
 
 def split_leave_by_year(start_date, end_date):
     years = {}
@@ -59,53 +25,12 @@ def split_leave_by_year(start_date, end_date):
             years[y] = (end_of_year - start_of_year).days + 1
     return years
 
-class LeaveRequestViewSet(ModelViewSet):
-    queryset = LeaveRequest.objects.select_related("employee", "leave_type")
-    serializer_class = LeaveRequestSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+"""
 
-    def get_queryset(self):
-        user = self.request.user
-        qs = self.queryset.all().order_by("-created_at")
+if "def split_leave_by_year" not in code:
+    code = code.replace("class LeaveRequestViewSet", split_leave_function + "class LeaveRequestViewSet")
 
-        # Server-side Filtering
-        status = self.request.query_params.get("status")
-        if status and status != "all":
-            qs = qs.filter(status=status)
-
-        department = self.request.query_params.get("department")
-        if department and department != "All":
-            qs = qs.filter(employee__department__name=department)
-
-        search = self.request.query_params.get("search")
-        if search:
-            qs = qs.filter(
-                Q(employee__user__username__icontains=search) |
-                Q(leave_type__name__icontains=search) |
-                Q(reason__icontains=search)
-            )
-
-        if user.role in ["admin", "hr"]:
-            return qs
-
-        if user.role == "manager":
-            try:
-                return qs.filter(employee__department=user.employee.department)
-            except Exception:
-                return qs.none()
-
-        try:
-            return qs.filter(employee=user.employee)
-        except Exception:
-            return qs.none()
-
-        try:
-            return qs.filter(employee=user.employee)
-        except Exception:
-            return qs.none()
-
-    def perform_create(self, serializer):
+new_logic = """    def perform_create(self, serializer):
         from employees.models import Employee
         with transaction.atomic():
             try:
@@ -272,155 +197,9 @@ class LeaveRequestViewSet(ModelViewSet):
             message=f"Your {leave.leave_type.name} leave ({leave.start_date} to {leave.end_date}) has been rejected by {request.user.username}.",
             link="/leaves?tab=my",
         )
-        return Response({"status": "rejected"})
+        return Response({"status": "rejected"})"""
 
-    @action(detail=False, methods=["get"], url_path="my")
-    def my(self, request):
-        """View own leave history."""
-        try:
-            leaves = self.queryset.filter(employee=request.user.employee)
-        except Exception:
-            return Response({"detail": "No employee record linked to your account."}, status=400)
-        page = self.paginate_queryset(leaves)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(leaves, many=True)
-        return Response(serializer.data)
+code = re.sub(r'    def perform_create\(self, serializer\):.*?        return Response\(\{"status": "rejected"\}\)', new_logic, code, flags=re.DOTALL)
 
-class LeaveBalanceViewSet(ModelViewSet):
-    queryset = LeaveBalance.objects.select_related("employee__user", "employee__department", "leave_type")
-    serializer_class = LeaveBalanceSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
-
-    def get_serializer_class(self):
-        if self.action in ["create", "update", "partial_update", "adjust"]:
-            return LeaveBalanceWriteSerializer
-        return LeaveBalanceSerializer
-
-    def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy", "adjust"]:
-            return [IsAdminOrHR()]
-        return super().get_permissions()
-
-    def get_queryset(self):
-        user = self.request.user
-        current_year = datetime.now().year
-        qs = self.queryset.all().filter(year=current_year).order_by("employee__user__username")
-
-        # Server-side Filtering
-        department = self.request.query_params.get("department")
-        if department and department != "All":
-            qs = qs.filter(employee__department__name=department)
-
-        search = self.request.query_params.get("search")
-        if search:
-            qs = qs.filter(
-                Q(employee__user__username__icontains=search) |
-                Q(employee__department__name__icontains=search)
-            )
-
-        if user.role in ["admin", "hr"]:
-            return qs
-
-        if user.role == "manager":
-            try:
-                return qs.filter(employee__department=user.employee.department)
-            except Exception:
-                return qs.none()
-
-        try:
-            return qs.filter(employee=user.employee)
-        except Exception:
-            return qs.none()
-
-        try:
-            return queryset.filter(employee=user.employee)
-        except Exception:
-            return queryset.none()
-
-    @action(detail=False, methods=["get"], url_path="my")
-    def my(self, request):
-        """View own leave balances."""
-        current_year = datetime.now().year
-        try:
-            balances = self.queryset.filter(employee=request.user.employee, year=current_year)
-        except Exception:
-            return Response({"detail": "No employee record linked to your account."}, status=400)
-        serializer = self.get_serializer(balances, many=True)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=["patch"], permission_classes=[IsAdminOrHR], url_path="adjust")
-    def adjust(self, request, pk=None):
-        """Admin/HR adjust allocated_days or used_days for a balance record."""
-        balance = self.get_object()
-        prev_allocated = float(balance.allocated_days)
-        prev_used = float(balance.used_days)
-
-        serializer = LeaveBalanceWriteSerializer(
-            balance,
-            data=request.data,
-            partial=True,
-            context=self.get_serializer_context(),
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        balance.refresh_from_db()
-
-        AuditLog.objects.create(
-            action_type="leave_balance_adjusted",
-            actor=request.user,
-            target_user=balance.employee.user,
-            message=f"{request.user.username} adjusted {balance.leave_type.name} leave balance for {balance.employee.user.username}",
-            metadata={
-                "balance_id": balance.id,
-                "employee_id": balance.employee_id,
-                "leave_type_id": balance.leave_type_id,
-                "year": balance.year,
-                "previous": {"allocated_days": prev_allocated, "used_days": prev_used},
-                "updated": {"allocated_days": float(balance.allocated_days), "used_days": float(balance.used_days)},
-            },
-        )
-
-        return Response(LeaveBalanceSerializer(balance).data)
-
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        AuditLog.objects.create(
-            action_type="leave_balance_adjusted",
-            actor=self.request.user,
-            target_user=instance.employee.user,
-            message=f"{self.request.user.username} created {instance.leave_type.name} leave balance for {instance.employee.user.username}",
-            metadata={
-                "balance_id": instance.id,
-                "employee_id": instance.employee_id,
-                "leave_type_id": instance.leave_type_id,
-                "year": instance.year,
-                "previous": None,
-                "updated": {"allocated_days": float(instance.allocated_days), "used_days": float(instance.used_days)},
-            },
-        )
-
-    def perform_update(self, serializer):
-        balance = self.get_object()
-        prev_allocated = float(balance.allocated_days)
-        prev_used = float(balance.used_days)
-
-        instance = serializer.save()
-
-        AuditLog.objects.create(
-            action_type="leave_balance_adjusted",
-            actor=self.request.user,
-            target_user=instance.employee.user,
-            message=f"{self.request.user.username} updated {instance.leave_type.name} leave balance for {instance.employee.user.username}",
-            metadata={
-                "balance_id": instance.id,
-                "employee_id": instance.employee_id,
-                "leave_type_id": instance.leave_type_id,
-                "year": instance.year,
-                "previous": {"allocated_days": prev_allocated, "used_days": prev_used},
-                "updated": {"allocated_days": float(instance.allocated_days), "used_days": float(instance.used_days)},
-            },
-        )
+with open("leaves/views.py", "w", encoding="utf-8") as f:
+    f.write(code)

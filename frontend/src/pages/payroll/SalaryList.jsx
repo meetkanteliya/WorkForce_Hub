@@ -6,8 +6,12 @@ import {
     fetchSalaries,
     selectSalaryList,
     selectSalaryLoading,
+    selectSalaryCount,
+
 } from '../../store/slices/payrollSlice';
 import { HiOutlinePlus } from 'react-icons/hi';
+import { Search, ChevronDown } from 'lucide-react';
+import { fetchDepartments, selectDepartmentList } from '../../store/slices/departmentSlice';
 
 export default function SalaryList() {
     const dispatch = useDispatch();
@@ -18,19 +22,47 @@ export default function SalaryList() {
     const loading = useSelector(selectSalaryLoading);
 
     const [tab, setTab] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [departmentFilter, setDepartmentFilter] = useState('All');
+    const totalItems = useSelector(selectSalaryCount);
+    const departments = useSelector(selectDepartmentList);
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const itemsPerPage = 50;
 
     useEffect(() => {
-        dispatch(fetchSalaries({ tab }));
-    }, [tab, dispatch]);
+        dispatch(fetchDepartments());
+    }, [dispatch]);
 
-    const totalItems = salaries.length;
+    useEffect(() => {
+        let currentPromise;
+        const fetchData = () => {
+            currentPromise = dispatch(fetchSalaries({ 
+                tab, 
+                page: currentPage, 
+                department: departmentFilter, 
+                search: searchQuery 
+            }));
+        };
+
+        const timer = setTimeout(() => {
+            fetchData();
+        }, 300);
+
+        const pollTimer = setInterval(() => {
+            fetchData();
+        }, 15000);
+
+        return () => {
+            clearTimeout(timer);
+            clearInterval(pollTimer);
+            if (currentPromise) currentPromise.abort();
+        };
+    }, [tab, currentPage, departmentFilter, searchQuery, dispatch]);
+
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const currentSalaries = salaries.slice(startIndex, startIndex + itemsPerPage);
 
     return (
         <div>
@@ -92,7 +124,7 @@ export default function SalaryList() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                                {currentSalaries.map((s) => (
+                                {salaries.map((s) => (
                                     <tr key={s.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                         <td className="px-6 py-4 text-sm font-medium text-slate-800 dark:text-white">{s.employee_name || `#${s.employee}`}</td>
                                         <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{s.department_name || '—'}</td>

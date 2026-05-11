@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 
 class AuditLog(models.Model):
@@ -67,3 +68,34 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{'Read' if self.is_read else 'Unread'}] {self.message[:50]}"
+
+
+class Attendance(models.Model):
+    """
+    Daily attendance record per employee.
+    Tracks check-in/check-out times and whether the employee was present.
+    Used for accurate present_today calculations (vs. the old leave-subtraction method).
+    """
+    employee = models.ForeignKey(
+        'employees.Employee',
+        on_delete=models.CASCADE,
+        related_name='attendance_records',
+    )
+    date = models.DateField(default=timezone.now, db_index=True)
+    check_in = models.TimeField(null=True, blank=True)
+    check_out = models.TimeField(null=True, blank=True)
+    hours_worked = models.FloatField(default=0.0)
+    is_present = models.BooleanField(default=True, db_index=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        unique_together = [('employee', 'date')]
+        verbose_name = 'Attendance'
+        verbose_name_plural = 'Attendance Records'
+
+    def __str__(self):
+        status = 'Present' if self.is_present else 'Absent'
+        return f"{self.employee.user.username} — {self.date} ({status})"

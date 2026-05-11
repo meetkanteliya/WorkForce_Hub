@@ -8,13 +8,18 @@ import API from '../../api/axios';
  */
 export const fetchLeaveRequests = createAsyncThunk(
     'leaves/fetchLeaveRequests',
-    async ({ tab = 'all' } = {}, { rejectWithValue }) => {
+    async ({ tab = 'all', page = 1, status = 'all', department = 'All', search = '' } = {}, { signal, rejectWithValue }) => {
         try {
             const endpoint = tab === 'my' ? '/leaves/requests/my/' : '/leaves/requests/';
-            const res = await API.get(endpoint);
-            const data = res.data.results ?? res.data;
-            return Array.isArray(data) ? data : [];
+            const params = { page };
+            if (status !== 'all') params.status = status;
+            if (department !== 'All') params.department = department;
+            if (search) params.search = search;
+            
+            const res = await API.get(endpoint, { params, signal });
+            return res.data;
         } catch (error) {
+            if (error.name === 'CanceledError' || error.name === 'AbortError') return rejectWithValue('canceled');
             return rejectWithValue(error.message);
         }
     }
@@ -100,11 +105,16 @@ export const createLeaveType = createAsyncThunk(
  */
 export const fetchBalances = createAsyncThunk(
     'leaves/fetchBalances',
-    async (_, { rejectWithValue }) => {
+    async ({ page = 1, department = 'All', search = '' } = {}, { signal, rejectWithValue }) => {
         try {
-            const res = await API.get('/leaves/balances/');
-            return res.data.results ?? res.data;
+            const params = { page };
+            if (department !== 'All') params.department = department;
+            if (search) params.search = search;
+            
+            const res = await API.get('/leaves/balances/', { params, signal });
+            return res.data;
         } catch (error) {
+            if (error.name === 'CanceledError' || error.name === 'AbortError') return rejectWithValue('canceled');
             return rejectWithValue(error.message);
         }
     }
@@ -140,31 +150,33 @@ export const adjustBalance = createAsyncThunk(
     }
 );
 
-// ── Initial State ──
-const initialState = {
-    // Requests
-    requests: [],
-    requestsLoading: false,
+    // Initial State
+    const initialState = {
+        // Requests
+        requests: [],
+        requestsCount: 0,
+        requestsLoading: false,
 
-    // Leave types
-    types: [],
-    typesLoading: false,
+        // Leave types
+        types: [],
+        typesLoading: false,
 
-    // Balances (all employees – admin view)
-    balances: [],
-    balanceLoading: false,
+        // Balances (all employees – admin view)
+        balances: [],
+        balancesCount: 0,
+        balanceLoading: false,
 
-    // My balances (current user)
-    myBalances: [],
+        // My balances (current user)
+        myBalances: [],
 
-    // Form state (create leave request)
-    formLoading: false,
-    formError: null,
+        // Form state (create leave request)
+        formLoading: false,
+        formError: null,
 
-    // Leave type create
-    typeFormLoading: false,
-    typeFormError: null,
-};
+        // Leave type create
+        typeFormLoading: false,
+        typeFormError: null,
+    };
 
 // ── Slice ──
 const leaveSlice = createSlice({
@@ -206,11 +218,19 @@ const leaveSlice = createSlice({
             })
             .addCase(fetchLeaveRequests.fulfilled, (state, action) => {
                 state.requestsLoading = false;
-                state.requests = action.payload;
+                if (action.payload?.results) {
+                    state.requests = action.payload.results;
+                    state.requestsCount = action.payload.count;
+                } else {
+                    state.requests = Array.isArray(action.payload) ? action.payload : [];
+                    state.requestsCount = state.requests.length;
+                }
             })
-            .addCase(fetchLeaveRequests.rejected, (state) => {
+            .addCase(fetchLeaveRequests.rejected, (state, action) => {
+                if (action.payload === 'canceled') return; // ignore canceled requests
                 state.requestsLoading = false;
                 state.requests = [];
+                state.requestsCount = 0;
             });
 
         // actionLeaveRequest
@@ -274,11 +294,19 @@ const leaveSlice = createSlice({
             })
             .addCase(fetchBalances.fulfilled, (state, action) => {
                 state.balanceLoading = false;
-                state.balances = action.payload;
+                if (action.payload?.results) {
+                    state.balances = action.payload.results;
+                    state.balancesCount = action.payload.count;
+                } else {
+                    state.balances = Array.isArray(action.payload) ? action.payload : [];
+                    state.balancesCount = state.balances.length;
+                }
             })
-            .addCase(fetchBalances.rejected, (state) => {
+            .addCase(fetchBalances.rejected, (state, action) => {
+                if (action.payload === 'canceled') return; // ignore canceled requests
                 state.balanceLoading = false;
                 state.balances = [];
+                state.balancesCount = 0;
             });
 
         // fetchMyBalances
@@ -309,10 +337,12 @@ export const {
 
 // ── Selectors ──
 export const selectLeaveRequests = (state) => state.leaves.requests;
+export const selectRequestsCount = (state) => state.leaves.requestsCount;
 export const selectRequestsLoading = (state) => state.leaves.requestsLoading;
 export const selectLeaveTypes = (state) => state.leaves.types;
 export const selectTypesLoading = (state) => state.leaves.typesLoading;
 export const selectBalances = (state) => state.leaves.balances;
+export const selectBalancesCount = (state) => state.leaves.balancesCount;
 export const selectBalanceLoading = (state) => state.leaves.balanceLoading;
 export const selectMyBalances = (state) => state.leaves.myBalances;
 export const selectLeaveFormLoading = (state) => state.leaves.formLoading;

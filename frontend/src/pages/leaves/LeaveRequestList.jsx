@@ -13,6 +13,8 @@ import {
     selectRequestsLoading,
     selectBalances,
     selectBalanceLoading,
+    selectRequestsCount,
+    selectBalancesCount,
 } from '../../store/slices/leaveSlice';
 import { fetchDepartments, selectDepartmentList } from '../../store/slices/departmentSlice';
 import AlertModal from '../../components/AlertModal';
@@ -42,7 +44,9 @@ export default function LeaveRequestList() {
     const requests = useSelector(selectLeaveRequests);
     const loading = useSelector(selectRequestsLoading);
     const balances = useSelector(selectBalances);
+    const balancesCount = useSelector(selectBalancesCount);
     const balanceLoading = useSelector(selectBalanceLoading);
+    const requestsCount = useSelector(selectRequestsCount);
     const departments = useSelector(selectDepartmentList);
 
     const [tab, setTab] = useState(searchParams.get('tab') || (hasRole('admin', 'hr') ? 'all' : 'my'));
@@ -67,12 +71,34 @@ export default function LeaveRequestList() {
 
     // ─── Fetch data via Redux ───
     useEffect(() => {
-        if (tab === 'balances') {
-            dispatch(fetchBalancesThunk());
-        } else {
-            dispatch(fetchLeaveRequests({ tab }));
-        }
-    }, [tab, dispatch]);
+        let currentPromise;
+        
+        const fetchData = () => {
+            if (tab === 'balances') {
+                currentPromise = dispatch(fetchBalancesThunk({ page: currentPage, department: departmentFilter, search: balanceSearch }));
+            } else {
+                currentPromise = dispatch(fetchLeaveRequests({ tab, page: currentPage, status: statusFilter, department: departmentFilter, search: searchQuery }));
+            }
+        };
+
+        // Debounce primary fetch
+        const timer = setTimeout(() => {
+            fetchData();
+        }, 300);
+
+        // Polling for multi-admin sync every 15 seconds
+        const pollInterval = setInterval(() => {
+            fetchData();
+        }, 15000);
+
+        return () => {
+            clearTimeout(timer);
+            clearInterval(pollInterval);
+            if (currentPromise) {
+                currentPromise.abort();
+            }
+        };
+    }, [tab, currentPage, statusFilter, departmentFilter, searchQuery, balanceSearch, dispatch]);
 
     // Fetch departments for filters (once)
     useEffect(() => {
@@ -90,6 +116,8 @@ export default function LeaveRequestList() {
     const handleAction = async (id, action) => {
         try {
             await dispatch(actionLeaveRequest({ id, action })).unwrap();
+            dispatch(fetchLeaveRequests({ tab, page: currentPage, status: statusFilter, department: departmentFilter, search: searchQuery }));
+            dispatch(fetchBalancesThunk({ page: 1, department: 'All', search: '' }));
         } catch (err) {
             setAlertMessage(err || `Failed to ${action} leave`);
             setAlertVariant('error');
@@ -115,6 +143,8 @@ export default function LeaveRequestList() {
                 used_days: Number(editForm.used_days)
             };
             const res = await dispatch(adjustBalance({ balanceId: balance.id, payload })).unwrap();
+            
+            dispatch(fetchBalancesThunk({ page: currentPage, department: departmentFilter, search: balanceSearch }));
 
             // If the modal is open, update the selectedEmployeeBalances state
             if (selectedEmployeeBalances) {
@@ -136,33 +166,9 @@ export default function LeaveRequestList() {
         setEditForm({ allocated_days: b.allocated_days, used_days: b.used_days });
     };
 
-    // ─── Filtered requests ───
-    const filteredRequests = requests
-        .filter(req => statusFilter === 'all' || req.status === statusFilter)
-        .filter(req =>
-            (req.employee || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (req.leave_type_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-        )
-
-        .filter(req => {
-            if (departmentFilter === 'All') return true;
-            return (req.employee_department || 'Unassigned') === departmentFilter;
-        });
-
-    // ─── Filtered balances ───
-    const searchFilteredBalances = balances.filter(b =>
-        (b.employee_name || '').toLowerCase().includes(balanceSearch.toLowerCase()) ||
-        (b.department_name || '').toLowerCase().includes(balanceSearch.toLowerCase())
-    ).filter(b => {
-        if (departmentFilter === 'All') return true;
-        return (b.department_name || 'Unassigned') === departmentFilter;
-    });
-
     // Group the balances by employee for the main table
     const groupedBalances = {};
-    searchFilteredBalances.forEach(b => {
-        // employee_code can be empty/null, causing all such users to collapse into one row!
-        // We use employee_name (or employee id if available)
+    balances.forEach(b => {
         const key = b.employee_id || b.employee_code || b.employee_name;
         if (!groupedBalances[key]) {
             groupedBalances[key] = {
@@ -177,7 +183,6 @@ export default function LeaveRequestList() {
                 records: []
             };
         }
-        // Prevent duplicate leave types for the same employee
         const existingRecordIndex = groupedBalances[key].records.findIndex(
             r => r.leave_type?.id === b.leave_type?.id
         );
@@ -188,20 +193,16 @@ export default function LeaveRequestList() {
             groupedBalances[key].total_remaining += parseFloat(b.remaining_days) || 0;
             groupedBalances[key].records.push(b);
         } else {
-            // Keep the latest record only (assuming higher ID means later or just take the new one)
             if (b.id > groupedBalances[key].records[existingRecordIndex].id) {
-                // Subtract old
                 const oldRec = groupedBalances[key].records[existingRecordIndex];
                 groupedBalances[key].total_allocated -= parseFloat(oldRec.allocated_days) || 0;
                 groupedBalances[key].total_used -= parseFloat(oldRec.used_days) || 0;
                 groupedBalances[key].total_remaining -= parseFloat(oldRec.remaining_days) || 0;
 
-                // Add new
                 groupedBalances[key].total_allocated += parseFloat(b.allocated_days) || 0;
                 groupedBalances[key].total_used += parseFloat(b.used_days) || 0;
                 groupedBalances[key].total_remaining += parseFloat(b.remaining_days) || 0;
 
-                // Replace
                 groupedBalances[key].records[existingRecordIndex] = b;
             }
         }
@@ -209,16 +210,11 @@ export default function LeaveRequestList() {
 
     const aggregatedBalancesArray = Object.values(groupedBalances).sort((a, b) => a.employee_name.localeCompare(b.employee_name));
 
-    // ─── Paginated lists ───
-    const totalRequests = filteredRequests.length;
-    const requestsTotalPages = Math.ceil(totalRequests / itemsPerPage) || 1;
+    const requestsTotalPages = Math.ceil(requestsCount / itemsPerPage) || 1;
+    const balancesTotalPages = Math.ceil(balancesCount / itemsPerPage) || 1;
     const requestsStartIndex = (currentPage - 1) * itemsPerPage;
-    const currentRequests = filteredRequests.slice(requestsStartIndex, requestsStartIndex + itemsPerPage);
-
-    const totalBalances = aggregatedBalancesArray.length;
-    const balancesTotalPages = Math.ceil(totalBalances / itemsPerPage) || 1;
     const balancesStartIndex = (currentPage - 1) * itemsPerPage;
-    const currentBalances = aggregatedBalancesArray.slice(balancesStartIndex, balancesStartIndex + itemsPerPage);
+
 
     return (
         <div className="animate-fade-in space-y-6">
@@ -359,7 +355,7 @@ export default function LeaveRequestList() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 bg-white dark:bg-transparent">
-                                    {currentBalances.map((group) => (
+                                    {aggregatedBalancesArray.map((group) => (
                                         <tr key={group.employee_id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
@@ -396,7 +392,7 @@ export default function LeaveRequestList() {
                             </table>
                         </div>
                         <PaginationFooter
-                            totalItems={totalBalances}
+                            totalItems={balancesCount}
                             currentPage={currentPage}
                             itemsPerPage={itemsPerPage}
                             setCurrentPage={setCurrentPage}
@@ -411,7 +407,7 @@ export default function LeaveRequestList() {
                     <div className="flex justify-center py-20">
                         <div className="w-10 h-10 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
                     </div>
-                ) : filteredRequests.length === 0 ? (
+                ) : requests.length === 0 ? (
                     <EmptyState icon={Clock4} title="No Leave Requests" subtitle="No leave requests matching your current filters." />
                 ) : (
                     <div className="glass-panel dark:bg-[#111827]/40 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
@@ -430,7 +426,7 @@ export default function LeaveRequestList() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 bg-white dark:bg-transparent">
-                                    {currentRequests.map((req) => (
+                                    {requests.map((req) => (
                                         <tr key={req.id} className="hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
@@ -488,7 +484,7 @@ export default function LeaveRequestList() {
                             </table>
                         </div>
                         <PaginationFooter
-                            totalItems={totalRequests}
+                            totalItems={requestsCount}
                             currentPage={currentPage}
                             itemsPerPage={itemsPerPage}
                             setCurrentPage={setCurrentPage}

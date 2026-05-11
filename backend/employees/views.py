@@ -9,12 +9,12 @@ from .serializers import EmployeeSerializer, DepartmentSerializer
 from accounts.permissions import IsAdmin, IsAdminOrHR
 from dashboard.models import AuditLog, Notification
 from django.utils import timezone
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q, Count
 from leaves.models import LeaveRequest
 
 
 class DepartmentViewSet(ModelViewSet):
-    queryset = Department.objects.all()
+    queryset = Department.objects.annotate(employee_count=Count("employees", distinct=True))
     serializer_class = DepartmentSerializer
     permission_classes = [IsAdmin]
 

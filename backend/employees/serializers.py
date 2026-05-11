@@ -6,6 +6,8 @@ User = get_user_model()
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
+    employee_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Department
         fields = "__all__"

@@ -1,4 +1,8 @@
 from rest_framework import serializers
+from django.core.validators import FileExtensionValidator
+import os
+
+ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'pdf', 'docx', 'xlsx', 'txt', 'csv']
 from django.contrib.auth import get_user_model
 from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageRead, CompanyChatMessageReaction
 
@@ -45,12 +49,20 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
     sender = ChatEmployeePublicSerializer(read_only=True)
     timestamp = serializers.DateTimeField(source="created_at", read_only=True)
     attachment_url = serializers.SerializerMethodField()
-    attachment = serializers.FileField(write_only=True, required=False, allow_null=True)
+    attachment = serializers.FileField(
+        write_only=True, 
+        required=False, 
+        allow_null=True,
+        validators=[FileExtensionValidator(allowed_extensions=ALLOWED_EXTENSIONS)]
+    )
+    reply_to_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    reply_to = serializers.SerializerMethodField()
     is_deleted = serializers.BooleanField(read_only=True)
     deleted_at = serializers.DateTimeField(read_only=True)
     deleted_by = ChatEmployeePublicSerializer(read_only=True)
     read_by_count = serializers.SerializerMethodField()
     reactions = serializers.SerializerMethodField()
+    temp_id = serializers.CharField(read_only=True, required=False, allow_null=True)
 
     class Meta:
         model = CompanyChatMessage
@@ -68,6 +80,9 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
             "deleted_by",
             "read_by_count",
             "reactions",
+            "reply_to",
+            "reply_to_id",
+            "temp_id",
         )
 
     def get_attachment_url(self, obj):
@@ -76,9 +91,31 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_reply_to(self, obj):
+        if not obj.reply_to_id:
+            return None
+        # Return basic info to avoid deep nesting
+        reply = obj.reply_to
+        if not reply: return None
+        return {
+            "id": reply.id,
+            "sender": {
+                "id": reply.sender_id,
+                "username": reply.sender.username,
+                "full_name": reply.sender.get_full_name() or reply.sender.username,
+            },
+            "content": reply.content if not reply.is_deleted else "",
+            "is_deleted": reply.is_deleted,
+        }
+
     def validate(self, attrs):
         content = (attrs.get("content") or "").strip()
         attachment = attrs.get("attachment", None)
+        
+        if attachment:
+            if attachment.size > 5 * 1024 * 1024:
+                raise serializers.ValidationError({"attachment": "File size cannot exceed 5MB."})
+
         if not content and not attachment:
             raise serializers.ValidationError("Message must include text content or an attachment.")
         return attrs

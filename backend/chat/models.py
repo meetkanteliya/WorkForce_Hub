@@ -23,6 +23,13 @@ class CompanyChatMessage(models.Model):
         on_delete=models.CASCADE,
         related_name='company_sent_messages',
     )
+    reply_to = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='replies'
+    )
     content = models.TextField(blank=True)
     attachment = models.FileField(upload_to="chat_uploads/", null=True, blank=True)
     attachment_name = models.CharField(max_length=255, blank=True)
@@ -97,7 +104,8 @@ class CompanyChatMessageReaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("message", "user", "emoji")
+        # One reaction per user per message (user can only have ONE active emoji)
+        unique_together = ("message", "user")
         indexes = [
             models.Index(fields=["message"]),
         ]

@@ -54,7 +54,7 @@ export default function MySalary() {
                             <div className="flex items-center gap-2">
                                 <HiOutlineCalendar className="w-5 h-5 text-indigo-500" />
                                 <span className="font-bold text-gray-800">
-                                    {dayjs(salary.salary_month).format('MMMM YYYY')}
+                                    {dayjs(salary.pay_date).format('MMMM YYYY')}
                                 </span>
                             </div>
                             <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">

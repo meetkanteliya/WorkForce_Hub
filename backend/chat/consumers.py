@@ -1,18 +1,16 @@
 import json
 import logging
-import os
+import urllib.parse
 from django.db import IntegrityError
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageReaction
 from employees.models import Department
 from accounts.models import User
-import urllib.parse
 from django.conf import settings
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
-# Setup simple file logging for debugging
 logger = logging.getLogger("chat_debug")
 logger.setLevel(logging.DEBUG)
 if not logger.handlers:
@@ -25,66 +23,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.department_id = self.scope['url_route']['kwargs']['department_id']
         self.room_group_name = f'chat_{self.department_id}'
         
-        logger.debug(f"ChatConsumer connect. Dept: {self.department_id}")
-
-        # Auth via token in query string
         query_string = self.scope['query_string'].decode()
         query_params = urllib.parse.parse_qs(query_string)
         token = query_params.get('token', [None])[0]
-        logger.debug(f"Token found: {bool(token)}")
 
         user = await self.get_user_from_token(token)
-        
-        if not user:
-            logger.debug("User not found from token")
+        if not user or not user.is_active:
             await self.close()
             return
-            
-        if not user.is_active:
-            logger.debug(f"User {user.username} is inactive")
+
+        if not await self.check_department_access(user, self.department_id):
             await self.close()
             return
 
         self.user = user
-
-        # Verify access
-        if not await self.check_department_access(user, self.department_id):
-            logger.debug(f"User {user.username} denied access to dept {self.department_id}")
-            await self.close()
-            return
-
-        # Join room group
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-        logger.debug(f"ChatConsumer connected: {user.username}")
 
     async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
-    # Receive message from WebSocket
     async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        message = text_data_json.get('message')
-
+        data = json.loads(text_data)
+        message = data.get('message')
         if message:
-            if not await self.is_user_active(self.user.id):
-                await self.close()
-                return
-            if not await self.check_department_access(self.user, self.department_id):
-                await self.close()
-                return
-            # Save to DB
             chat_message = await self.save_message(self.user.id, self.department_id, message)
-            
-            # Send message to room group
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -93,14 +56,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'message': chat_message.content,
                     'sender_id': self.user.id,
                     'sender_name': await self.get_full_name(self.user.id),
-                    'sender_profile_picture': await self.get_profile_pic(self.user),
                     'timestamp': chat_message.timestamp.isoformat()
                 }
             )
 
-    # Receive message from room group
     async def chat_message(self, event):
-        # Send message to WebSocket
         await self.send(text_data=json.dumps(event))
 
     @database_sync_to_async
@@ -108,107 +68,62 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not token: return None
         try:
             access = AccessToken(token)
-            user_id = access.get("user_id")
-            if not user_id:
-                return None
-            return User.objects.get(id=user_id)
-        except (TokenError, InvalidToken) as e:
-            logger.debug(f"JWT validation error: {e}")
-            return None
-        except Exception as e:
-            logger.debug(f"JWT lookup error: {e}")
+            return User.objects.get(id=access["user_id"])
+        except Exception:
             return None
 
     @database_sync_to_async
     def check_department_access(self, user, department_id):
-        if user.role in ['admin', 'hr']:
-            return True
-        if hasattr(user, 'employee'):
-            return str(user.employee.department_id) == str(department_id)
-        return False
+        if user.role in ['admin', 'hr']: return True
+        return hasattr(user, 'employee') and str(user.employee.department_id) == str(department_id)
 
     @database_sync_to_async
     def save_message(self, user_id, department_id, content):
-        return ChatMessage.objects.create(
-            sender_id=user_id,
-            department_id=department_id,
-            content=content
-        )
-
-    @database_sync_to_async
-    def get_profile_pic(self, user):
-        try:
-            return user.employee.profile_picture.url if user.employee.profile_picture else None
-        except Exception:
-            return None
+        return ChatMessage.objects.create(sender_id=user_id, department_id=department_id, content=content)
 
     @database_sync_to_async
     def get_full_name(self, user_id):
-        try:
-            u = User.objects.get(id=user_id)
-            name = (u.get_full_name() or "").strip()
-            return name or u.username
-        except Exception:
-            return ""
-
-    @database_sync_to_async
-    def is_user_active(self, user_id):
-        return User.objects.filter(id=user_id, is_active=True).exists()
-
+        u = User.objects.get(id=user_id)
+        return (u.get_full_name() or u.username).strip()
 
 class CompanyChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        logger.debug("CompanyChatConsumer connect")
         self.room_group_name = "company_chat"
-
         query_string = self.scope['query_string'].decode()
         query_params = urllib.parse.parse_qs(query_string)
         token = query_params.get('token', [None])[0]
-        logger.debug(f"Token found: {bool(token)}")
 
         user = await self.get_user_from_token(token)
-        if not user:
-            logger.debug("User not found from token")
-            await self.close()
-            return
-            
-        if not user.is_active:
-            logger.debug(f"User {user.username} is inactive")
-            await self.close()
-            return
-            
-        if not await self.has_employee_profile(user.id):
-            logger.debug(f"User {user.username} has no employee profile")
+        if not user or not user.is_active:
             await self.close()
             return
 
         self.user = user
+        self.full_name = await self.get_full_name(self.user.id)
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
-        logger.debug(f"CompanyChatConsumer connected: {user.username}")
 
-        # Broadcast join presence
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "company_presence",
                 "event": "join",
                 "user_id": self.user.id,
-                "full_name": await self.get_full_name(self.user.id),
+                "full_name": self.full_name,
             },
         )
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-        if getattr(self, "user", None):
+        if hasattr(self, "user"):
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     "type": "company_presence",
                     "event": "leave",
                     "user_id": self.user.id,
-                    "full_name": await self.get_full_name(self.user.id),
+                    "full_name": self.full_name,
                 },
             )
 
@@ -216,19 +131,14 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data or "{}")
         event_type = data.get("type") or "message"
 
-        if not await self.is_user_active(self.user.id) or not await self.has_employee_profile(self.user.id):
-            await self.close()
-            return
-
         if event_type == "typing":
-            is_typing = bool(data.get("is_typing"))
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     "type": "company_typing",
                     "user_id": self.user.id,
-                    "full_name": await self.get_full_name(self.user.id),
-                    "is_typing": is_typing,
+                    "full_name": self.full_name,
+                    "is_typing": bool(data.get("is_typing")),
                 },
             )
             return
@@ -237,8 +147,7 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
             message_id = data.get("message_id")
             emoji = data.get("emoji")
             if message_id and emoji:
-                updated = await self.toggle_reaction(self.user.id, message_id, emoji)
-                if updated:
+                if await self.toggle_reaction(self.user.id, message_id, emoji):
                     reactions = await self.get_message_reactions(message_id)
                     await self.channel_layer.group_send(
                         self.room_group_name,
@@ -250,98 +159,67 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
                     )
             return
 
-        # default: message
         message = (data.get("message") or "").strip()
-        if not message:
+        temp_id = data.get("temp_id")
+        reply_to_id = data.get("reply_to_id")
+        
+        # Validation
+        if not message and not data.get("attachment"):
             return
+        
+        # Validate message length
+        if len(message) > 5000:
+            return
+        
+        # Validate reply_to_id exists if provided
+        if reply_to_id:
+            if not await self.message_exists(reply_to_id):
+                reply_to_id = None
 
-        msg = await self.save_company_message(self.user.id, message)
+        msg = await self.save_company_message(self.user.id, message, reply_to_id)
+        payload = await self.serialize_company_message(msg.id)
+        
+        # Echo temp_id back for frontend reconciliation
+        if temp_id:
+            payload["temp_id"] = temp_id
+
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 "type": "company_chat_message",
-                "payload": await self.serialize_company_message(msg.id),
+                "payload": payload,
             },
         )
 
     async def company_chat_message(self, event):
-        payload = event.get("payload")
-        await self.send(text_data=json.dumps({"type": "company_chat_message", "payload": payload}))
+        await self.send(text_data=json.dumps({"type": "company_chat_message", "payload": event["payload"]}))
 
     async def company_typing(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "company_typing",
-            "user_id": event.get("user_id"),
-            "full_name": event.get("full_name"),
-            "is_typing": event.get("is_typing"),
-        }))
+        await self.send(text_data=json.dumps({"type": "company_typing", **event}))
 
     async def company_presence(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "company_presence",
-            "event": event.get("event"),
-            "user_id": event.get("user_id"),
-            "full_name": event.get("full_name"),
-        }))
-
-    async def employee_event(self, event):
-        await self.send(text_data=json.dumps({"type": "employee", **event}))
-
-    async def company_message_deleted(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "company_message_deleted",
-            "payload": event.get("payload"),
-        }))
-
-    async def company_read_receipt(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "company_read_receipt",
-            "payload": event.get("payload"),
-        }))
+        await self.send(text_data=json.dumps({"type": "company_presence", **event}))
 
     async def company_reaction_update(self, event):
-        await self.send(text_data=json.dumps({
-            "type": "company_reaction_update",
-            "message_id": event.get("message_id"),
-            "reactions": event.get("reactions"),
-        }))
+        await self.send(text_data=json.dumps({"type": "company_reaction_update", **event}))
 
     @database_sync_to_async
     def get_user_from_token(self, token):
         if not token: return None
         try:
             access = AccessToken(token)
-            user_id = access.get("user_id")
-            if not user_id:
-                return None
-            return User.objects.get(id=user_id)
-        except (TokenError, InvalidToken) as e:
-            logger.debug(f"JWT validation error: {e}")
+            return User.objects.get(id=access["user_id"])
+        except Exception:
             return None
-        except Exception as e:
-            logger.debug(f"JWT lookup error: {e}")
-            return None
-
-    @database_sync_to_async
-    def has_employee_profile(self, user_id):
-        return User.objects.filter(id=user_id, employee__isnull=False).exists()
-
-    @database_sync_to_async
-    def is_user_active(self, user_id):
-        return User.objects.filter(id=user_id, is_active=True).exists()
 
     @database_sync_to_async
     def get_full_name(self, user_id):
-        try:
-            u = User.objects.get(id=user_id)
-            name = (u.get_full_name() or "").strip()
-            return name or u.username
-        except Exception:
-            return ""
+        u = User.objects.get(id=user_id)
+        return (u.get_full_name() or u.username).strip()
 
     @database_sync_to_async
-    def save_company_message(self, user_id, content):
-        return CompanyChatMessage.objects.create(sender_id=user_id, content=content)
+    def save_company_message(self, user_id, content, reply_to_id=None):
+        return CompanyChatMessage.objects.create(sender_id=user_id, content=content, reply_to_id=reply_to_id)
 
     @database_sync_to_async
     def serialize_company_message(self, msg_id):
@@ -351,35 +229,47 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def toggle_reaction(self, user_id, message_id, emoji):
-        """Toggle a reaction if the message exists and is not deleted."""
-        message = CompanyChatMessage.objects.filter(
-            id=message_id,
-            deleted_at__isnull=True,
-        ).only("id").first()
-        if not message:
+        """
+        Toggle reaction with one-reaction-per-user constraint.
+        If user already has a different reaction, replace it.
+        If user clicks same reaction, remove it.
+        """
+        message = CompanyChatMessage.objects.filter(id=message_id, deleted_at__isnull=True).first()
+        if not message: 
             return False
-
-        try:
-            obj, created = CompanyChatMessageReaction.objects.get_or_create(
-                message_id=message.id,
-                user_id=user_id,
-                emoji=emoji,
+        
+        # Get user's existing reaction on this message (if any)
+        existing_reaction = CompanyChatMessageReaction.objects.filter(
+            message_id=message_id, 
+            user_id=user_id
+        ).first()
+        
+        if existing_reaction:
+            if existing_reaction.emoji == emoji:
+                # Same emoji - remove it (toggle off)
+                existing_reaction.delete()
+            else:
+                # Different emoji - replace it
+                existing_reaction.emoji = emoji
+                existing_reaction.save(update_fields=['emoji'])
+        else:
+            # No existing reaction - create new one
+            CompanyChatMessageReaction.objects.create(
+                message_id=message_id, 
+                user_id=user_id, 
+                emoji=emoji
             )
-        except IntegrityError:
-            logger.debug("Failed to toggle reaction for message_id=%s", message_id)
-            return False
-
-        if not created:
-            obj.delete()
+        
         return True
 
     @database_sync_to_async
     def get_message_reactions(self, message_id):
-        """Return reactions as {emoji: [user_id, ...]} dict."""
-        qs = CompanyChatMessageReaction.objects.filter(
-            message_id=message_id
-        ).values_list("emoji", "user_id")
-        result = {}
-        for emoji, user_id in qs:
-            result.setdefault(emoji, []).append(user_id)
-        return result
+        qs = CompanyChatMessageReaction.objects.filter(message_id=message_id).values_list("emoji", "user_id")
+        res = {}
+        for emoji, uid in qs:
+            res.setdefault(emoji, []).append(uid)
+        return res
+
+    @database_sync_to_async
+    def message_exists(self, message_id):
+        return CompanyChatMessage.objects.filter(id=message_id, deleted_at__isnull=True).exists()

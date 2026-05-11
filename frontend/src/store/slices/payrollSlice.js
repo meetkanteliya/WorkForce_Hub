@@ -8,13 +8,17 @@ import API from '../../api/axios';
  */
 export const fetchSalaries = createAsyncThunk(
     'payroll/fetchSalaries',
-    async ({ tab = 'all' } = {}, { rejectWithValue }) => {
+    async ({ tab = 'all', page = 1, department = 'All', search = '' } = {}, { signal, rejectWithValue }) => {
         try {
             const endpoint = tab === 'my' ? '/payroll/my/' : '/payroll/';
-            const res = await API.get(endpoint);
-            const data = res.data.results ?? res.data;
-            return Array.isArray(data) ? data : [];
+            const params = { page };
+            if (department !== 'All') params.department = department;
+            if (search) params.search = search;
+            
+            const res = await API.get(endpoint, { params, signal });
+            return res.data;
         } catch (error) {
+            if (error.name === 'CanceledError' || error.name === 'AbortError') return rejectWithValue('canceled');
             return rejectWithValue(error.message);
         }
     }
@@ -83,6 +87,7 @@ export const updateSalary = createAsyncThunk(
 // ── Initial State ──
 const initialState = {
     list: [],
+    totalCount: 0,
     loading: false,
 
     // Form state
@@ -107,11 +112,19 @@ const payrollSlice = createSlice({
             })
             .addCase(fetchSalaries.fulfilled, (state, action) => {
                 state.loading = false;
-                state.list = action.payload;
+                if (action.payload?.results) {
+                    state.list = action.payload.results;
+                    state.totalCount = action.payload.count;
+                } else {
+                    state.list = Array.isArray(action.payload) ? action.payload : [];
+                    state.totalCount = state.list.length;
+                }
             })
-            .addCase(fetchSalaries.rejected, (state) => {
+            .addCase(fetchSalaries.rejected, (state, action) => {
+                if (action.payload === 'canceled') return;
                 state.loading = false;
                 state.list = [];
+                state.totalCount = 0;
             });
 
         // createSalary
@@ -151,6 +164,7 @@ export const { clearPayrollFormError } = payrollSlice.actions;
 
 // ── Selectors ──
 export const selectSalaryList = (state) => state.payroll.list;
+export const selectSalaryCount = (state) => state.payroll.totalCount;
 export const selectSalaryLoading = (state) => state.payroll.loading;
 export const selectPayrollFormLoading = (state) => state.payroll.formLoading;
 export const selectPayrollFormError = (state) => state.payroll.formError;

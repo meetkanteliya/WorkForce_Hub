@@ -14,11 +14,13 @@ import {
   incrementUnread,
   selectMessages,
   selectLoadingHistory,
+  selectHasMoreHistory,
   selectMembers,
   selectTypingUsers,
   selectUnreadCount,
 } from '../../store/slices/chatSlice';
 import { Send, MessageSquare, Clock, Paperclip, Users, Trash2, Shield, Hash, X, FileText, Download, MoreHorizontal, Copy, Reply } from 'lucide-react';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 function getBackendOrigin() {
   return import.meta.env.VITE_BACKEND_ORIGIN || 'http://localhost:8000';
@@ -58,21 +60,25 @@ export default function CompanyChat() {
   const tokens = useSelector(selectTokens);
   const messages = useSelector(selectMessages(CHANNEL_KEY));
   const loadingHistory = useSelector(selectLoadingHistory(CHANNEL_KEY));
+  const hasMoreHistory = useSelector(selectHasMoreHistory(CHANNEL_KEY));
   const members = useSelector(selectMembers);
   const typingUsers = useSelector(selectTypingUsers(CHANNEL_KEY));
   const unreadCount = useSelector(selectUnreadCount(CHANNEL_KEY));
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [offlineQueue, setOfflineQueue] = useState([]);
+  const [isOnline, setIsOnline] = useState(true);
 
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
-  const [activeReactionMsgId, setActiveReactionMsgId] = useState(null);
+  const [activeMessageId, setActiveMessageId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const [contextMenuId, setContextMenuId] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
+  const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef(null);
-  const showLegacyReactionBar = false;
   const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🙏', '🔥'];
 
   const socketRef = useRef(null);
@@ -81,6 +87,7 @@ export default function CompanyChat() {
   const fileInputRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const longPressTimerRef = useRef(null);
 
   const meId = user?.id;
 
@@ -107,6 +114,41 @@ export default function CompanyChat() {
 
       ws.onopen = () => {
         reconnectAttemptsRef.current = 0;
+        setIsOnline(true);
+        
+        // Sync missed messages
+        if (messagesEndRef.current && socketRef.current.hasDisconnectedBefore) {
+             const stateMessages = document.querySelectorAll('[data-msg-id]');
+             let lastId = null;
+             if (stateMessages.length > 0) {
+                 lastId = stateMessages[stateMessages.length - 1].getAttribute('data-msg-id');
+             }
+             if (lastId) {
+                 dispatch(fetchMessages({ channel: 'company', since_id: lastId }));
+             }
+        }
+        socketRef.current.hasDisconnectedBefore = true;
+
+        // Process offline queue with error handling
+        if (offlineQueue.length > 0) {
+            const queueCopy = [...offlineQueue];
+            setOfflineQueue([]);
+            
+            queueCopy.forEach(msg => {
+                try {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify(msg));
+                    } else {
+                        // Re-queue if socket closed
+                        setOfflineQueue(prev => [...prev, msg]);
+                    }
+                } catch(e) {
+                    console.error('Failed to send queued message:', e);
+                    // Re-queue failed message
+                    setOfflineQueue(prev => [...prev, msg]);
+                }
+            });
+        }
       };
 
       ws.onmessage = (event) => {
@@ -151,8 +193,9 @@ export default function CompanyChat() {
       };
 
       ws.onclose = () => {
+        setIsOnline(false);
         reconnectAttemptsRef.current += 1;
-        const delay = Math.min(5000, reconnectAttemptsRef.current * 1000);
+        const delay = Math.min(5000, reconnectAttemptsRef.current * 1000) + Math.random() * 1000;
         reconnectTimerRef.current = setTimeout(() => {
           connectWebSocket();
         }, delay);
@@ -172,6 +215,24 @@ export default function CompanyChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Infinite Scroll Handler
+  const handleScroll = (e) => {
+      if (e.target.scrollTop === 0 && hasMoreHistory && !isFetchingMore && !loadingHistory) {
+          setIsFetchingMore(true);
+          const currentHeight = e.target.scrollHeight;
+          const currentScrollTop = e.target.scrollTop;
+          
+          dispatch(fetchMessages({ channel: 'company', offset: messages.length })).finally(() => {
+              requestAnimationFrame(() => {
+                  if (e.target) {
+                      const newHeight = e.target.scrollHeight;
+                      e.target.scrollTop = newHeight - currentHeight + currentScrollTop;
+                  }
+                  setIsFetchingMore(false);
+              });
+          });
+      }
+  };
   const sendTyping = (isTyping) => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -181,14 +242,87 @@ export default function CompanyChat() {
 
 
 
+  const handlePaste = (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) {
+      if (item.type.indexOf('image') === 0) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleFileSelected(file);
+        break;
+      }
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelected(files[0]);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    if (e.target === e.currentTarget) {
+      setDragOver(false);
+    }
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
     const text = input.trim();
+    if (!text) return;
+    
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const msgObj = { 
+        type: 'message', 
+        message: text,
+        reply_to_id: replyTo?.id || null,
+        temp_id: tempId
+    };
+    
+    const optimisticMsg = {
+        id: tempId,
+        content: text,
+        sender: {
+            id: user?.id,
+            username: user?.username,
+            full_name: user?.full_name || user?.username,
+            role: user?.role,
+            profile_picture: user?.employee?.profile_picture || null
+        },
+        timestamp: new Date().toISOString(),
+        is_deleted: false,
+        status: 'sending',
+        reply_to: replyTo || null,
+        reactions: {},
+        attachment_url: null,
+        temp_id: tempId
+    };
+    
+    dispatch(addMessage({ key: CHANNEL_KEY, message: optimisticMsg }));
+    
     const socket = socketRef.current;
-    if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: 'message', message: text }));
+    
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        dispatch(updateMessage({ key: CHANNEL_KEY, message: { ...optimisticMsg, status: 'failed' } }));
+        setOfflineQueue(prev => [...prev, msgObj]);
+    } else {
+        socket.send(JSON.stringify(msgObj));
+    }
+    
     setInput('');
+    setReplyTo(null);
     sendTyping(false);
+    if (inputRef.current) inputRef.current.style.height = 'auto';
   };
 
   const handlePickFile = () => {
@@ -202,9 +336,17 @@ export default function CompanyChat() {
       const form = new FormData();
       form.append("attachment", file);
       form.append("content", input.trim());
+      if (replyTo?.id) {
+        form.append("reply_to_id", replyTo.id);
+      }
+      
       await API.post("/chat/company/messages/", form);
       setInput("");
+      setReplyTo(null);
       sendTyping(false);
+      if (inputRef.current) inputRef.current.style.height = 'auto';
+    } catch (error) {
+      console.error("Upload failed:", error);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -236,7 +378,7 @@ export default function CompanyChat() {
       }));
     }
     setContextMenuId(null);
-    setActiveReactionMsgId(null);
+    setActiveMessageId(null);
     // Clear reply if the deleted message was being replied to
     if (replyTo?.id === id) setReplyTo(null);
   };
@@ -261,8 +403,7 @@ export default function CompanyChat() {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: 'reaction', message_id: msgId, emoji }));
-    setActiveReactionMsgId(null);
-    setContextMenuId(null);
+    // Keep toolbar open after reaction
   };
 
   // @mention input handling
@@ -297,35 +438,63 @@ export default function CompanyChat() {
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const filteredMentions = (members || []).filter(m =>
-    m.id !== meId && (m.username?.toLowerCase().includes(mentionFilter) || m.full_name?.toLowerCase().includes(mentionFilter))
-  ).slice(0, 5);
+  const filteredMentions = useMemo(() => {
+    return (members || []).filter(m =>
+      m.id !== meId && (
+        m.username?.toLowerCase().includes(mentionFilter) || 
+        m.full_name?.toLowerCase().includes(mentionFilter)
+      )
+    ).slice(0, 5);
+  }, [members, meId, mentionFilter]);
 
   // Render content with @mention highlights
   const renderContent = (text) => {
     if (!text) return null;
-    const parts = text.split(/(@\w+)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        return <span key={i} className="font-bold text-emerald-300 dark:text-emerald-400 bg-emerald-500/10 px-0.5 rounded">{part}</span>;
-      }
-      return part;
+    const lines = text.split('\n');
+    return lines.map((line, l_idx) => {
+      const parts = line.split(/(@\w+)/g);
+      return (
+        <span key={l_idx}>
+          {parts.map((part, i) => {
+            if (part.startsWith('@')) {
+              return <span key={i} className="font-bold text-emerald-300 dark:text-emerald-400 bg-emerald-500/10 px-0.5 rounded">{part}</span>;
+            }
+            return part;
+          })}
+          {l_idx < lines.length - 1 && <br />}
+        </span>
+      );
     });
   };
 
   const typingList = Object.values(typingUsers);
 
-  // Click outside to close reaction popup
+  // Click outside to close action toolbar
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (activeReactionMsgId && !e.target.closest('[data-msg-actions]')) {
-        setActiveReactionMsgId(null);
+      // Check if click is outside message actions
+      if (activeMessageId && !e.target.closest('[data-msg-actions]') && !e.target.closest('[data-msg-bubble]')) {
+        setActiveMessageId(null);
         setContextMenuId(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [activeReactionMsgId]);
+    
+    const handleEscapeKey = (e) => {
+      if (e.key === 'Escape') {
+        setActiveMessageId(null);
+        setContextMenuId(null);
+      }
+    };
+    
+    if (activeMessageId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscapeKey);
+      };
+    }
+  }, [activeMessageId]);
 
   // Group messages by date
   const groupedMessages = useMemo(() => {
@@ -346,10 +515,26 @@ export default function CompanyChat() {
   const onlineCount = members?.length || 0;
 
   return (
-    <div className="flex h-[calc(100vh-120px)] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg">
+    <ErrorBoundary>
+    <div 
+      className="flex h-[calc(100vh-120px)] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
 
       {/* ─── Main Chat Area ─── */}
       <div className="flex-1 flex flex-col bg-slate-50 dark:bg-[#0F172A] min-w-0">
+
+        {/* Drag overlay */}
+        {dragOver && (
+          <div className="absolute inset-0 z-50 bg-emerald-500/10 backdrop-blur-sm border-4 border-dashed border-emerald-500 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <Paperclip className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">Drop file to upload</p>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="h-16 px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-[#1E293B] shrink-0">
@@ -366,8 +551,17 @@ export default function CompanyChat() {
                   </span>
                 )}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                {onlineCount} member{onlineCount !== 1 ? 's' : ''} • Everyone can see this
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-2">
+                <span>{onlineCount} member{onlineCount !== 1 ? 's' : ''}</span>
+                {!isOnline && (
+                    <span className="flex items-center gap-1 text-rose-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                        Reconnecting...
+                    </span>
+                )}
+                {isOnline && offlineQueue.length > 0 && (
+                    <span className="text-amber-500">Sending queued ({offlineQueue.length})...</span>
+                )}
               </p>
             </div>
           </div>
@@ -385,7 +579,7 @@ export default function CompanyChat() {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-1">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-1" onScroll={handleScroll}>
           {loadingHistory ? (
             <div className="flex flex-col justify-center items-center h-full gap-3">
               <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -416,26 +610,27 @@ export default function CompanyChat() {
               }
 
               const msg = item.data;
-              const sender = msg.sender || {};
+              const sender = msg?.sender || {};
               const isMe = sender.id === meId;
-              const isDeleted = !!msg.is_deleted;
+              const isDeleted = !!msg?.is_deleted;
               // Only the admin who deleted the message sees "deleted by admin"
-              const iAmTheDeleter = isDeleted && msg.deleted_by && msg.deleted_by.id === meId && msg.deleted_by.id !== sender.id;
-              const isReactionMenuOpen = activeReactionMsgId === msg.id;
-              const reactionEntries = Object.entries(msg.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length > 0);
+              const iAmTheDeleter = isDeleted && msg?.deleted_by && msg.deleted_by.id === meId && msg.deleted_by.id !== sender.id;
+              const isActionMenuOpen = activeMessageId === msg?.id;
+              const reactionEntries = msg?.reactions ? Object.entries(msg.reactions).filter(([, users]) => Array.isArray(users) && users.length > 0) : [];
               const hasReactions = reactionEntries.length > 0;
 
               const pic = sender.profile_picture
                 ? `${getBackendOrigin()}${sender.profile_picture}`
-                : avatarUrl(sender.full_name || sender.username);
+                : avatarUrl(sender.full_name || sender.username || 'User');
 
-              const hasAttachment = !!msg.attachment_url;
-              const attachmentIsImage = isImageFile(msg.attachment_url);
-              const attachmentFullUrl = msg.attachment_url ? `${getBackendOrigin()}${msg.attachment_url}` : '';
+              const hasAttachment = !!msg?.attachment_url;
+              const attachmentIsImage = hasAttachment && isImageFile(msg.attachment_url);
+              const attachmentFullUrl = msg?.attachment_url ? `${getBackendOrigin()}${msg.attachment_url}` : '';
 
               return (
                 <div
                   key={msg.id || i}
+                  data-msg-id={msg.id}
                   className={`flex gap-2.5 group relative ${isMe ? 'flex-row-reverse' : ''}`}
                 >
                   {/* Avatar */}
@@ -450,20 +645,7 @@ export default function CompanyChat() {
                   {/* Message Bubble */}
                   <div
                     className={`max-w-[75%] sm:max-w-[65%] relative ${isMe ? 'items-end' : 'items-start'}`}
-                    data-msg-actions
-                    onMouseEnter={() => {
-                      if (!isDeleted) setActiveReactionMsgId(msg.id);
-                    }}
-                    onMouseLeave={() => {
-                      if (contextMenuId !== msg.id) {
-                        setActiveReactionMsgId((current) => (current === msg.id ? null : current));
-                      }
-                    }}
-                    onClick={(e) => {
-                      if (isDeleted || e.target.closest('a') || e.target.closest('button')) return;
-                      setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
-                      setContextMenuId(null);
-                    }}
+                    data-msg-bubble
                   >
                     {/* Sender Name (only for others) */}
                     {!isMe && (
@@ -482,31 +664,41 @@ export default function CompanyChat() {
 
                     {/* Bubble */}
                     <div
+                      onClick={(e) => {
+                        if (isDeleted || e.target.closest('a') || e.target.closest('button')) return;
+                        // Toggle action menu on click
+                        setActiveMessageId(activeMessageId === msg.id ? null : msg.id);
+                        setContextMenuId(null);
+                      }}
                       className={`relative px-3.5 py-2 rounded-2xl text-[13px] leading-relaxed transition-all cursor-pointer ${
                         isDeleted
                           ? 'bg-slate-100 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700' + (isMe ? ' rounded-tr-md' : ' rounded-tl-md')
                           : isMe
                             ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-tr-md shadow-md shadow-emerald-500/15'
                             : 'bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-800 rounded-tl-md shadow-sm'
-                      }${!isDeleted
+                      }${!isDeleted && isActionMenuOpen
+                        ? isMe
+                          ? ' ring-2 ring-emerald-300 dark:ring-emerald-400/50 shadow-lg shadow-emerald-500/25'
+                          : ' ring-2 ring-slate-300 dark:ring-slate-500/50 shadow-lg'
+                        : !isDeleted
                         ? isMe
                           ? ' hover:ring-2 hover:ring-emerald-300/50 dark:hover:ring-emerald-400/30 hover:shadow-lg hover:shadow-emerald-500/25'
                           : ' hover:ring-2 hover:ring-slate-300/60 dark:hover:ring-slate-500/40 hover:shadow-lg'
                         : ''
                       }`}
                     >
-                      {!isDeleted && isReactionMenuOpen && (
+                      {!isDeleted && isActionMenuOpen && (
                         <div
                           className={`absolute -top-12 ${isMe ? 'right-0' : 'left-0'} z-20`}
                           data-msg-actions
                         >
-                          <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 px-2 py-1 shadow-xl backdrop-blur-sm">
+                          <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 shadow-xl animate-fade-in">
                             {QUICK_EMOJIS.map(emoji => (
                               <button
                                 key={emoji}
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleReaction(msg.id, emoji); }}
-                                className="flex h-7 w-7 items-center justify-center rounded-full text-sm transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                className="flex h-7 w-7 items-center justify-center rounded-full text-sm transition-all hover:scale-125 hover:bg-slate-100 dark:hover:bg-slate-700"
                                 title={emoji}
                               >
                                 {emoji}
@@ -526,7 +718,7 @@ export default function CompanyChat() {
                               </button>
 
                               {contextMenuId === msg.id && (
-                                <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50`} data-msg-actions>
+                                <div className={`absolute top-full mt-2 ${isMe ? 'right-0' : 'left-0'} w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50 animate-fade-in`} data-msg-actions>
                                   <button onClick={(e) => { e.stopPropagation(); handleCopy(msg); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                                     <Copy className="w-3.5 h-3.5" /> Copy
                                   </button>
@@ -550,10 +742,10 @@ export default function CompanyChat() {
                       )}
 
                       {/* Reply Quote */}
-                      {msg.replyTo && (
+                      {msg.reply_to && msg.reply_to.sender && (
                         <div className={`mb-1.5 px-2.5 py-1.5 rounded-lg border-l-2 text-[11px] ${isMe ? 'bg-white/10 border-white/40' : 'bg-slate-50 dark:bg-slate-800 border-emerald-400'}`}>
-                          <span className="font-bold">{msg.replyTo.sender?.username}</span>
-                          <p className="opacity-70 truncate">{msg.replyTo.content}</p>
+                          <span className="font-bold">{msg.reply_to.sender.username || msg.reply_to.sender.full_name || 'Unknown'}</span>
+                          <p className="opacity-70 truncate">{msg.reply_to.is_deleted ? '[deleted]' : (msg.reply_to.content || '')}</p>
                         </div>
                       )}
 
@@ -612,6 +804,11 @@ export default function CompanyChat() {
                       <div className={`text-[9px] mt-1 flex items-center gap-1 ${isMe ? 'text-white/50 justify-end' : 'text-slate-400 dark:text-slate-600'}`}>
                         <Clock className="w-2.5 h-2.5" />
                         {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                        {isMe && !isDeleted && (
+                            <span className="ml-1 font-bold">
+                                {msg.status === 'sending' ? '• Sending' : msg.status === 'failed' ? '• Pending' : '✓'}
+                            </span>
+                        )}
                       </div>
                     </div>
 
@@ -636,63 +833,6 @@ export default function CompanyChat() {
                       </div>
                     )}
                   </div>
-
-                  {/* ─── Click Action Bar (Emoji + 3 dots) ─── */}
-                  {showLegacyReactionBar && !isDeleted && isReactionMenuOpen && (
-                    <div className={`flex items-center self-center gap-0.5 ${isMe ? 'order-first' : ''}`} data-msg-actions>
-                      <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-1 py-0.5">
-                        {/* Quick Emoji Reactions */}
-                        {QUICK_EMOJIS.map(emoji => (
-                          <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReaction(msg.id, emoji); }}
-                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors text-sm hover:scale-125"
-                            title={emoji}>
-                            {emoji}
-                          </button>
-                        ))}
-
-                        {/* Divider */}
-                        <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-                        {/* 3-dot Menu */}
-                        <div className="relative">
-                          <button onClick={(e) => { e.stopPropagation(); setContextMenuId(contextMenuId === msg.id ? null : msg.id); }}
-                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-white">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-
-                          {/* Context Menu Dropdown */}
-                          {contextMenuId === msg.id && (
-                            <div className={`absolute top-full mt-1 ${isMe ? 'right-0' : 'left-0'} w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1 z-50`} data-msg-actions>
-                              <button onClick={(e) => { e.stopPropagation(); handleCopy(msg); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                <Copy className="w-3.5 h-3.5" /> Copy
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleReply(msg); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                                <Reply className="w-3.5 h-3.5" /> Reply
-                              </button>
-                              {canDelete(msg) && (
-                                <>
-                                  <div className="h-px bg-slate-100 dark:bg-slate-700 my-0.5" />
-                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg); setContextMenuId(null); }}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Deleted messages show no action bar — only a subtle indicator on hover */}
-                  {isDeleted && isReactionMenuOpen && (
-                    <div className={`flex items-center self-center ${isMe ? 'order-first' : ''}`}>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-600 italic select-none px-2">
-                        deleted
-                      </span>
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -756,15 +896,27 @@ export default function CompanyChat() {
                 </div>
               )}
 
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={input}
-                onChange={(e) => onInputChange(e.target.value)}
-                placeholder="Type a message... (use @ to mention)"
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-xl
+                onChange={(e) => {
+                    onInputChange(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = (e.target.scrollHeight < 120 ? e.target.scrollHeight : 120) + 'px';
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(e);
+                    }
+                }}
+                onPaste={handlePaste}
+                placeholder="Type a message... (Shift+Enter for newline, @ to mention)"
+                rows={1}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-700 rounded-xl
                   text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600
-                  focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium resize-none overflow-y-auto"
+                style={{ minHeight: '44px', maxHeight: '120px' }}
               />
             </div>
 
@@ -843,5 +995,6 @@ export default function CompanyChat() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

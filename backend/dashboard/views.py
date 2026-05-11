@@ -5,14 +5,15 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
-from accounts.permissions import IsAdmin, IsAdminOrHR
+from accounts.permissions import IsAdmin, IsAdminOrHR, IsManagerOrAbove
 from employees.models import Employee, Department
-from leaves.models import LeaveRequest, LeaveType
+from leaves.models import LeaveRequest, LeaveType, LeaveBalance
 from payroll.models import Salary
-from .models import AuditLog
+from .models import AuditLog, Attendance
 
 from .serializers import (
     DashboardEmployeeSerializer,
@@ -33,12 +34,43 @@ class DashboardPagination(PageNumberPagination):
     max_page_size = 100
 
 
+# ─────────────── Helper: compute present_today correctly ─────────────
+def _compute_present_today(today=None):
+    """
+    Priority-based present_today calculation:
+      1. If Attendance records exist for today → count is_present=True entries.
+      2. Fallback (no attendance records yet) → total_active minus those on
+         approved leave today. This matches the old logic but is clearly labeled
+         as a fallback.
+    Returns (present_count, used_attendance_model: bool)
+    """
+    if today is None:
+        today = date.today()
+
+    has_attendance_today = Attendance.objects.filter(date=today).exists()
+    if has_attendance_today:
+        present_count = Attendance.objects.filter(date=today, is_present=True).count()
+        return present_count, True
+
+    # Fallback: active employees who don't have an approved leave today
+    total_active = Employee.objects.filter(user__is_active=True).count()
+    on_leave_ids = (
+        LeaveRequest.objects
+        .filter(status="approved", start_date__lte=today, end_date__gte=today)
+        .values_list("employee_id", flat=True)
+        .distinct()
+    )
+    present_count = max(0, total_active - len(set(on_leave_ids)))
+    return present_count, False
+
+
 # ───────────────────────────── 1. SUMMARY ────────────────────────────
 class DashboardSummaryView(APIView):
     """
     GET /api/dashboard/summary/
     Returns all card-level data in one optimised call.
     Designed for live polling — includes last_updated timestamp.
+    Accessible to: Admin, HR
     """
     permission_classes = [IsAdminOrHR]
 
@@ -86,7 +118,8 @@ class DashboardSummaryView(APIView):
             end_date__gte=today
         ).values("employee").distinct().count()
 
-        present_today = total_employees - employees_on_leave_today
+        # ── FIX: Use proper attendance-based present_today ──
+        present_today, using_attendance = _compute_present_today(today)
 
         # Upcoming leaves (next 7 days)
         upcoming_leaves = LeaveRequest.objects.filter(
@@ -98,9 +131,9 @@ class DashboardSummaryView(APIView):
         # Pending leave requests count
         pending_leave_requests = LeaveRequest.objects.filter(status="pending").count()
 
-        # Recent audit log entries
+        # ── FIX: Audit log ordered by -created_at ──
         recent_audit = AuditLogSerializer(
-            AuditLog.objects.select_related("actor", "target_user")[:15],
+            AuditLog.objects.select_related("actor", "target_user").order_by("-created_at")[:15],
             many=True,
         ).data
 
@@ -117,6 +150,7 @@ class DashboardSummaryView(APIView):
 
             # Attendance & Leave Overview
             "present_today": present_today,
+            "present_today_source": "attendance" if using_attendance else "leave_fallback",
             "upcoming_leaves": upcoming_leaves,
 
             # Leave status counts
@@ -360,17 +394,218 @@ class DashboardActivityView(APIView):
     """
     GET /api/dashboard/activity/
     Full audit log feed (last 30 events) from the AuditLog model.
+    Ordered by -created_at (newest first).
     """
     permission_classes = [IsAdminOrHR]
 
     def get(self, request):
-        logs = AuditLog.objects.select_related("actor", "target_user")[:30]
+        # ── FIX: Explicit order_by ensures newest entries always come first ──
+        logs = AuditLog.objects.select_related("actor", "target_user").order_by("-created_at")[:30]
         serializer = AuditLogSerializer(logs, many=True)
         return Response(serializer.data)
 
 
-# ──────────────── 9. NOTIFICATIONS ──────────────────────────────────
-from rest_framework.permissions import IsAuthenticated
+# ──────────────── 9. MANAGER DASHBOARD ──────────────────────────────
+class ManagerDashboardView(APIView):
+    """
+    GET /api/dashboard/manager/
+    Real team data for the logged-in manager:
+      - Team members in the same department
+      - Their leave balances (current year)
+      - Today's attendance records (or approved leave status if no attendance)
+    """
+    permission_classes = [IsManagerOrAbove]
+
+    def get(self, request):
+        today = date.today()
+        current_year = today.year
+
+        try:
+            manager_employee = request.user.employee
+            dept = manager_employee.department
+        except Exception:
+            return Response({"detail": "No employee profile linked to your account."}, status=400)
+
+        if not dept:
+            return Response({"detail": "You are not assigned to any department."}, status=400)
+
+        # All employees in this department
+        team_employees = (
+            Employee.objects
+            .filter(department=dept, user__is_active=True)
+            .select_related("user", "department")
+            .order_by("user__username")
+        )
+
+        team_data = []
+        for emp in team_employees:
+            # Leave balance summary for current year
+            balances = LeaveBalance.objects.filter(employee=emp, year=current_year)
+            total_allocated = sum(b.allocated_days for b in balances)
+            total_used = sum(b.used_days for b in balances)
+
+            # Attendance for today
+            try:
+                attendance = Attendance.objects.get(employee=emp, date=today)
+                check_in_str = attendance.check_in.strftime("%I:%M %p") if attendance.check_in else "—"
+                check_out_str = attendance.check_out.strftime("%I:%M %p") if attendance.check_out else "—"
+                hours_worked = attendance.hours_worked
+                is_present = attendance.is_present
+                attendance_source = "attendance"
+            except Attendance.DoesNotExist:
+                # Fallback: check if employee has approved leave today
+                on_leave = LeaveRequest.objects.filter(
+                    employee=emp,
+                    status="approved",
+                    start_date__lte=today,
+                    end_date__gte=today,
+                ).exists()
+                check_in_str = "—"
+                check_out_str = "—"
+                hours_worked = 0.0
+                is_present = not on_leave
+                attendance_source = "leave_fallback"
+
+            team_data.append({
+                "id": emp.id,
+                "name": emp.user.get_full_name() or emp.user.username,
+                "username": emp.user.username,
+                "role": emp.user.role,
+                "designation": emp.designation or "—",
+                "profile_picture": emp.profile_picture.url if emp.profile_picture else None,
+                "employee_code": emp.employee_code or "—",
+                # Leave
+                "assigned_leaves": total_allocated,
+                "used_leaves": total_used,
+                "remaining_leaves": max(0, total_allocated - total_used),
+                # Attendance
+                "login": check_in_str,
+                "logout": check_out_str,
+                "hours_worked": hours_worked,
+                "is_present": is_present,
+                "attendance_source": attendance_source,
+            })
+
+        return Response({
+            "last_updated": timezone.now().isoformat(),
+            "department": {
+                "id": dept.id,
+                "name": dept.name,
+            },
+            "team": team_data,
+            "team_count": len(team_data),
+            "present_count": sum(1 for m in team_data if m["is_present"]),
+        })
+
+
+# ──────────────── 10. EMPLOYEE SELF-DASHBOARD ────────────────────────
+class EmployeeDashboardView(APIView):
+    """
+    GET /api/dashboard/employee/
+    Real self-service data for the logged-in employee:
+      - Leave balances for current year (all leave types)
+      - Today's attendance (check-in, check-out, hours)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = date.today()
+        current_year = today.year
+
+        try:
+            employee = request.user.employee
+        except Exception:
+            return Response({"detail": "No employee profile linked to your account."}, status=400)
+
+        # All leave balances for this employee this year
+        balances = LeaveBalance.objects.filter(
+            employee=employee, year=current_year
+        ).select_related("leave_type")
+
+        leave_data = []
+        total_allocated = 0
+        total_used = 0
+        for b in balances:
+            allocated = float(b.allocated_days)
+            used = float(b.used_days)
+            total_allocated += allocated
+            total_used += used
+            leave_data.append({
+                "leave_type": b.leave_type.name,
+                "allocated_days": allocated,
+                "used_days": used,
+                "remaining_days": max(0, allocated - used),
+            })
+
+        # Today's attendance
+        try:
+            attendance = Attendance.objects.get(employee=employee, date=today)
+            check_in_str = attendance.check_in.strftime("%I:%M %p") if attendance.check_in else "—"
+            check_out_str = attendance.check_out.strftime("%I:%M %p") if attendance.check_out else "—"
+            hours_worked = attendance.hours_worked
+            is_present = attendance.is_present
+            attendance_source = "attendance"
+        except Attendance.DoesNotExist:
+            on_leave = LeaveRequest.objects.filter(
+                employee=employee,
+                status="approved",
+                start_date__lte=today,
+                end_date__gte=today,
+            ).first()
+            check_in_str = "—"
+            check_out_str = "—"
+            hours_worked = 0.0
+            is_present = on_leave is None
+            attendance_source = "leave_fallback"
+
+        # Upcoming approved leaves for this employee
+        upcoming = list(
+            LeaveRequest.objects
+            .filter(
+                employee=employee,
+                status="approved",
+                start_date__gt=today,
+                start_date__lte=today + timedelta(days=30),
+            )
+            .select_related("leave_type")
+            .order_by("start_date")
+            .values("id", "leave_type__name", "start_date", "end_date", "reason")[:5]
+        )
+
+        # Pending leave requests
+        pending_count = LeaveRequest.objects.filter(employee=employee, status="pending").count()
+
+        return Response({
+            "last_updated": timezone.now().isoformat(),
+            "employee": {
+                "id": employee.id,
+                "name": request.user.get_full_name() or request.user.username,
+                "username": request.user.username,
+                "role": request.user.role,
+                "designation": employee.designation or "—",
+                "department": employee.department.name if employee.department else "Unassigned",
+                "profile_picture": employee.profile_picture.url if employee.profile_picture else None,
+            },
+            # Leave summary
+            "assigned_leaves": total_allocated,
+            "used_leaves": total_used,
+            "remaining_leaves": max(0, total_allocated - total_used),
+            "leave_breakdown": leave_data,
+            "pending_requests": pending_count,
+            "upcoming_leaves": upcoming,
+            # Today's attendance
+            "today": {
+                "date": today.isoformat(),
+                "login": check_in_str,
+                "logout": check_out_str,
+                "hours_worked": hours_worked,
+                "is_present": is_present,
+                "attendance_source": attendance_source,
+            },
+        })
+
+
+# ──────────────── 11. NOTIFICATIONS ──────────────────────────────────
 from .models import Notification
 
 

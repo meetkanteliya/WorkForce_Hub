@@ -137,17 +137,18 @@ export default function SalaryForm() {
                     </div>
 
                     {/* Net salary preview */}
-                    <div className="bg-indigo-50 rounded-lg p-4">
-                        <p className="text-sm text-indigo-600 font-medium">Net Salary Preview</p>
-                        <p className="text-2xl font-bold text-indigo-700">
+                    <div className={`rounded-lg p-4 ${(Number(form.basic_salary || 0) + Number(form.bonus || 0) - Number(form.deductions || 0)) < 0 ? 'bg-red-50' : 'bg-indigo-50'}`}>
+                        <p className={`text-sm font-medium ${(Number(form.basic_salary || 0) + Number(form.bonus || 0) - Number(form.deductions || 0)) < 0 ? 'text-red-600' : 'text-indigo-600'}`}>Net Salary Preview</p>
+                        <p className={`text-2xl font-bold ${(Number(form.basic_salary || 0) + Number(form.bonus || 0) - Number(form.deductions || 0)) < 0 ? 'text-red-700' : 'text-indigo-700'}`}>
                             ₹{(Number(form.basic_salary || 0) + Number(form.bonus || 0) - Number(form.deductions || 0)).toLocaleString()}
                         </p>
                     </div>
 
                     <div className="flex gap-3">
                         <button
-                            type="submit" disabled={loading}
+                            type="submit" disabled={loading || (Number(form.basic_salary || 0) + Number(form.bonus || 0) - Number(form.deductions || 0)) < 0}
                             className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                        > text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
                         >
                             {loading ? 'Saving...' : isEdit ? 'Update' : 'Create'}
                         </button>

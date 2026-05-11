@@ -15,19 +15,27 @@ const channelKey = (channel, id) =>
  */
 export const fetchMessages = createAsyncThunk(
     'chat/fetchMessages',
-    async ({ channel, departmentId }, { rejectWithValue }) => {
+    async ({ channel, departmentId, offset = 0, since_id = null }, { rejectWithValue }) => {
         try {
-            const endpoint =
-                channel === 'company'
-                    ? '/chat/company/messages/'
-                    : `/chat/messages/?department=${departmentId}`;
+            let endpoint = channel === 'company' ? '/chat/company/messages/' : `/chat/messages/?department=${departmentId}`;
+            
+            const params = new URLSearchParams();
+            if (offset) params.append('offset', offset);
+            if (since_id) params.append('since_id', since_id);
+            
+            if (params.toString()) {
+                endpoint += (endpoint.includes('?') ? '&' : '?') + params.toString();
+            }
+            
             const res = await API.get(endpoint);
             const data = res.data?.results ?? res.data;
             const results = Array.isArray(data) ? data : [];
-            // API returns newest-first, reverse to get oldest-first for display
             return {
                 key: channelKey(channel, departmentId),
-                messages: results.slice().reverse(),
+                messages: results.slice().reverse(), // Backend gives newest first
+                isLoadMore: offset > 0,
+                isSync: !!since_id,
+                hasMore: res.data?.next !== null && res.data?.next !== undefined
             };
         } catch (error) {
             return rejectWithValue(error.message);
@@ -71,6 +79,8 @@ const initialState = {
     messages: {},
     // loading state per channel
     loadingHistory: {},
+    // has more history per channel
+    hasMoreHistory: {},
     // company members
     members: [],
     // typing users per channel: { "company": { userId: name, ... } }
@@ -100,10 +110,27 @@ const chatSlice = createSlice({
         addMessage(state, action) {
             const { key, message } = action.payload;
             ensureChannel(state, key);
-            // Prevent duplicates
-            if (!state.messages[key].some((m) => m.id === message.id)) {
-                state.messages[key].push(message);
+            
+            // If the incoming message has a temp_id (ACK from server)
+            if (message.temp_id) {
+                const tempIdx = state.messages[key].findIndex((m) => m.id === message.temp_id || m.temp_id === message.temp_id);
+                if (tempIdx !== -1) {
+                    // Replace temp message with real message from server
+                    state.messages[key][tempIdx] = { ...message, status: 'delivered' };
+                    return;
+                }
             }
+            
+            // Prevent duplicates by real ID
+            const existingIdx = state.messages[key].findIndex((m) => m.id === message.id);
+            if (existingIdx !== -1) {
+                // Update existing message instead of adding duplicate
+                state.messages[key][existingIdx] = { ...message, status: 'delivered' };
+                return;
+            }
+            
+            // Add new message
+            state.messages[key].push({ ...message, status: message.status || 'delivered' });
         },
 
         /**
@@ -225,8 +252,31 @@ const chatSlice = createSlice({
                 state.loadingHistory[key] = true;
             })
             .addCase(fetchMessages.fulfilled, (state, action) => {
-                const { key, messages } = action.payload;
-                state.messages[key] = messages;
+                const { key, messages, isLoadMore, isSync, hasMore } = action.payload;
+                if (!state.messages[key]) state.messages[key] = [];
+                
+                if (isLoadMore) {
+                    // Prepend older messages
+                    const existingIds = new Set(state.messages[key].map(m => m.id));
+                    const newMessages = messages.filter(m => !existingIds.has(m.id));
+                    state.messages[key] = [...newMessages, ...state.messages[key]];
+                } else if (isSync) {
+                    // Merge new messages without duplicates
+                    const existingIds = new Set(state.messages[key].map(m => m.id));
+                    const newMessages = messages.filter(m => !existingIds.has(m.id));
+                    state.messages[key] = [...state.messages[key], ...newMessages];
+                } else {
+                    // Initial load - preserve optimistic messages
+                    const optimisticMessages = state.messages[key].filter(m => 
+                        m.status === 'sending' || m.status === 'failed' || m.id?.toString().startsWith('temp_')
+                    );
+                    const fetchedIds = new Set(messages.map(m => m.id));
+                    const preservedOptimistic = optimisticMessages.filter(m => !fetchedIds.has(m.id));
+                    state.messages[key] = [...messages, ...preservedOptimistic];
+                }
+                
+                state.hasMoreHistory = state.hasMoreHistory || {};
+                state.hasMoreHistory[key] = hasMore !== undefined ? hasMore : false;
                 state.loadingHistory[key] = false;
             })
             .addCase(fetchMessages.rejected, (state, action) => {
@@ -278,6 +328,7 @@ export const {
 // ── Selectors ──
 export const selectMessages = (key) => (state) => state.chat.messages[key] || [];
 export const selectLoadingHistory = (key) => (state) => !!state.chat.loadingHistory[key];
+export const selectHasMoreHistory = (key) => (state) => state.chat.hasMoreHistory?.[key] || false;
 export const selectMembers = (state) => state.chat.members;
 export const selectTypingUsers = (key) => (state) => state.chat.typingUsers[key] || {};
 export const selectUnreadCount = (key) => (state) => state.chat.unreadCounts[key] || 0;

@@ -59,6 +59,11 @@ class CompanyChatMessageListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         qs = CompanyChatMessage.objects.select_related("sender", "deleted_by").order_by("-created_at")
+        
+        since_id = self.request.query_params.get("since_id")
+        if since_id and since_id.isdigit():
+            qs = qs.filter(id__gt=int(since_id))
+
         q = (self.request.query_params.get("q") or "").strip()
         if q:
             from django.db.models import Q

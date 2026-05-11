@@ -27,6 +27,7 @@ import DashboardLeaveOverview from './pages/dashboard/DashboardLeaveOverview';
 import DashboardPayroll from './pages/dashboard/DashboardPayroll';
 import DashboardActivity from './pages/dashboard/DashboardActivity';
 import CompanyChat from './pages/chat/CompanyChat';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Initializes app-level side effects (e.g. fetch profile pic on load)
 function AppInitializer({ children }) {
@@ -70,7 +71,7 @@ export default function App() {
                         }
                     >
                         <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/chat" element={<CompanyChat />} />
+                        <Route path="/chat" element={<ErrorBoundary><CompanyChat /></ErrorBoundary>} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/change-password" element={<ChangePassword />} />
 
