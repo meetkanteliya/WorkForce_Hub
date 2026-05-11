@@ -44,21 +44,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received in ChatConsumer")
+            return
+        
         message = data.get('message')
+        temp_id = data.get('temp_id')
+        
         if message:
             chat_message = await self.save_message(self.user.id, self.department_id, message)
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'id': chat_message.id,
-                    'message': chat_message.content,
-                    'sender_id': self.user.id,
-                    'sender_name': await self.get_full_name(self.user.id),
-                    'timestamp': chat_message.timestamp.isoformat()
-                }
-            )
+            payload = {
+                'type': 'chat_message',
+                'id': chat_message.id,
+                'message': chat_message.content,
+                'sender_id': self.user.id,
+                'sender_name': await self.get_full_name(self.user.id),
+                'sender_profile_picture': await self.get_profile_picture(self.user.id),
+                'timestamp': chat_message.timestamp.isoformat()
+            }
+            
+            # Echo temp_id back for frontend reconciliation
+            if temp_id:
+                payload['temp_id'] = temp_id
+            
+            await self.channel_layer.group_send(self.room_group_name, payload)
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event))
@@ -85,6 +96,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_full_name(self, user_id):
         u = User.objects.get(id=user_id)
         return (u.get_full_name() or u.username).strip()
+    
+    @database_sync_to_async
+    def get_profile_picture(self, user_id):
+        try:
+            u = User.objects.get(id=user_id)
+            return u.employee.profile_picture.url if hasattr(u, 'employee') and u.employee.profile_picture else None
+        except Exception:
+            return None
 
 class CompanyChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -128,7 +147,12 @@ class CompanyChatConsumer(AsyncWebsocketConsumer):
             )
 
     async def receive(self, text_data):
-        data = json.loads(text_data or "{}")
+        try:
+            data = json.loads(text_data or "{}")
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received in CompanyChatConsumer")
+            return
+        
         event_type = data.get("type") or "message"
 
         if event_type == "typing":

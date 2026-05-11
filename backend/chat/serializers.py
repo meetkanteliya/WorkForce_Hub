@@ -3,6 +3,23 @@ from django.core.validators import FileExtensionValidator
 import os
 
 ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'pdf', 'docx', 'xlsx', 'txt', 'csv']
+
+# MIME type validation for security
+ALLOWED_MIME_TYPES = [
+    # Images
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/bmp',
+    # Documents
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # docx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # xlsx
+]
+
 from django.contrib.auth import get_user_model
 from .models import ChatMessage, CompanyChatMessage, CompanyChatMessageRead, CompanyChatMessageReaction
 
@@ -113,8 +130,40 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
         attachment = attrs.get("attachment", None)
         
         if attachment:
+            # Validate file size
             if attachment.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError({"attachment": "File size cannot exceed 5MB."})
+            
+            # Validate MIME type for security
+            mime_type = getattr(attachment, "content_type", "")
+            if mime_type not in ALLOWED_MIME_TYPES:
+                raise serializers.ValidationError({
+                    "attachment": f"File type '{mime_type}' is not allowed. Allowed types: images, PDF, text, CSV, DOCX, XLSX."
+                })
+            
+            # Validate extension matches MIME type (prevent spoofing)
+            file_name = getattr(attachment, "name", "")
+            ext = file_name.split('.')[-1].lower() if '.' in file_name else ''
+            
+            # Basic MIME/extension consistency check
+            mime_ext_map = {
+                'image/jpeg': ['jpg', 'jpeg'],
+                'image/png': ['png'],
+                'image/gif': ['gif'],
+                'image/webp': ['webp'],
+                'image/bmp': ['bmp'],
+                'application/pdf': ['pdf'],
+                'text/plain': ['txt'],
+                'text/csv': ['csv'],
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx'],
+            }
+            
+            expected_exts = mime_ext_map.get(mime_type, [])
+            if expected_exts and ext not in expected_exts:
+                raise serializers.ValidationError({
+                    "attachment": f"File extension '{ext}' does not match MIME type '{mime_type}'."
+                })
 
         if not content and not attachment:
             raise serializers.ValidationError("Message must include text content or an attachment.")
@@ -132,7 +181,11 @@ class CompanyChatMessageSerializer(serializers.ModelSerializer):
         return CompanyChatMessageRead.objects.filter(message=obj).exclude(user_id=obj.sender_id).count()
 
     def get_reactions(self, obj):
-        """Return reactions as {emoji: [user_id, ...]} dict."""
+        """Return reactions as {emoji: [user_id, ...]} dict. Empty for deleted messages."""
+        # Don't show reactions for deleted messages
+        if obj.is_deleted:
+            return {}
+        
         qs = CompanyChatMessageReaction.objects.filter(message=obj).values_list("emoji", "user_id")
         result = {}
         for emoji, user_id in qs:
