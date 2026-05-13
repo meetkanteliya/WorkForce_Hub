@@ -814,7 +814,7 @@ Building this project helped me develop and demonstrate:
 
 **Thank you for checking out WorkForce Hub!**
 
-Made with ❤️ and ☕ by [Your Name]
+Made with ❤️ and ☕ by Meet kanteliya
 
 [⬆ Back to Top](#-workforce-hub)
 
