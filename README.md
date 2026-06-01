@@ -1,6 +1,6 @@
 # WorkForce Hub
 
-A full-stack HR management system built with Django and React during my internship at Fxis.ai.
+Built as the core project during my internship at Fxis.ai, where I implemented the same stack used in production.
 
 ---
 
